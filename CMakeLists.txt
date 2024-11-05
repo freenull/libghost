@@ -46,20 +46,24 @@ add_custom_command(
     COMMAND xxd -n gh_embeddedjail_exe_data -i "${PROJECT_BINARY_DIR}/ghost-jail" > "${PROJECT_BINARY_DIR}/embedded_jail.c"
     DEPENDS ${jail_src} ${jail_inc}
 )
-add_custom_target(ghost-embedded-jail DEPENDS "${PROJECT_BINARY_DIR}/embedded_jail.c")
-
-add_custom_target(genexdebug COMMAND ${CMAKE_COMMAND} -E echo "a = $<LIST:FILTER,$<TARGET_OBJECTS:libghost-nojail>,EXCLUDE,.*\/embedded_jail.c>")
-
+add_custom_target(ghost-embedded-jail DEPENDS "${PROJECT_BINARY_DIR}/embedded_jail.c" ghost-jail)
 
 set(ghost_embedded_jail_src "src/ghost/embedded_jail.c")
 
+# In the future, this can be used to avoid the need to build libghost sources twice
+# In its current form, it causes an issue with dependency resolution
+# (CMake doesn't realize that when a piece of source code changes, and thus the libghost-nojail object files are rebuit, that this target has to run again)
+# add_library(
+#     libghost SHARED
+#     $<LIST:APPEND,$<LIST:FILTER,$<TARGET_OBJECTS:libghost-nojail>,EXCLUDE,.*\/embedded_jail.c>,${ghost_embedded_jail_src}>
+# )
+
 add_library(
     libghost SHARED
-    $<LIST:APPEND,$<LIST:FILTER,$<TARGET_OBJECTS:libghost-nojail>,EXCLUDE,.*\/embedded_jail.c>,${ghost_embedded_jail_src}>
+    ${ghost_src} ${ghost_embedded_jail_src}
 )
 
-add_dependencies(libghost ghost-enum-error ghost-embedded-jail ghost-jail libghost-nojail)
-add_dependencies(libghost libghost-nojail)
+add_dependencies(libghost ghost-embedded-jail ghost-jail)
 set_target_properties(libghost PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(libghost PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 set_target_properties(libghost PROPERTIES OUTPUT_NAME "ghost")
