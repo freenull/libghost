@@ -4,6 +4,10 @@ Secure Lua execution environment based on LuaJIT with process isolation.
 
 Result of engineering thesis at the Wrocław University of Science and Technology [link todo].
 
+## Supported platforms
+
+Currently, only Linux is supported.
+
 ## Requirements
 
 * Linux kernel 3.5+ (with seccomp-bpf)
