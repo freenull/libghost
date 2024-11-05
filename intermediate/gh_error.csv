@@ -1,0 +1,21 @@
+EnumKey,Value,Description
+OK,0,Success (no error)
+EMBEDDEDJAIL_CREATEFAIL,,Failed creating memory file for embedded jail executable
+EMBEDDEDJAIL_WRITEFAIL,,Failed writing embedded jail executable to memory file - write failed
+EMBEDDEDJAIL_WRITETRUNC,,Failed writing embedded jail executable to memory file - written data was truncated
+EMBEDDEDJAIL_UNAVAILABLE,,Jail executable has not been embedded in the shared library
+EMBEDDEDJAIL_EXECFAIL,,Failed executing jail executable
+SANDBOX_OPTIONSFDCONVERTFAIL,,Failed converting sandbox options file descriptor to string
+SANDBOX_OPTIONSREADFAIL,,Failed reading sandbox options from file descriptor
+JAIL_OPTIONSMEMFAIL,,Failed creating memory file containing sandbox options
+JAIL_OPTIONSWRITEFAIL,,Failed writing to memory file containing sandbox options
+JAIL_OPTIONSSEEKFAIL,,Failed seeking memory file containing sandbox options
+JAIL_NOOPTIONSFD,,Jail process was not provided a sandbox options structure file descriptor
+JAIL_OPTIONSFDPARSEFAIL,,Failed parsing sandbox options file descriptor argument
+JAIL_NONEWPRIVSFAIL,,Failed disabling exec privilege escalation in jail process
+JAIL_MEMRESTRICTFAIL,,Failed restricting maximum memory in jail process
+JAIL_SECCOMPFAIL,,Installing seccomp filter in jail process failed
+JAIL_WAITFAIL,,Failed waiting for child process PID
+JAIL_NONZEROEXIT,,Jail process exitted with non-zero status code
+JAIL_KILLEDSIG,,Jail process was killed with signal
+UNKNOWN,,Unknown error

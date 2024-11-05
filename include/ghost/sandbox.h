@@ -1,0 +1,50 @@
+#ifndef GHOST_SANDBOX_H
+#define GHOST_SANDBOX_H
+
+#include <stdlib.h>
+#include <ghost/result.h>
+
+#define GHOST_SANDBOXOPTIONS_NAME_MAX 256
+
+#define GH_SANDBOX_NOMEMLIMIT 0
+
+typedef struct {
+    char name[GHOST_SANDBOXOPTIONS_NAME_MAX];
+    size_t memory_limit;
+} gh_sandboxoptions;
+
+typedef struct {
+    pid_t pid;
+    gh_sandboxoptions options;
+} gh_sandbox;
+
+/** @brief Constructs a sandbox object.
+ *
+ * @par This function spawns a new jail process.
+ *
+ * @param sandbox Pointer to the uninitialized sandbox object.
+ * @param options Structure containing configuration of the jail process and its sandbox.
+ *
+ * @return Result code.
+ */
+gh_result gh_sandbox_ctor(gh_sandbox * sandbox, gh_sandboxoptions options);
+
+/** @brief Waits for the process handling the sandbox to exit.
+ *
+ * @param sandbox Pointer to the sandbox object.
+ *
+ * @return @ref GHR_OK if the process exited successfully (with exit code 0).
+ *         @ref GHR_JAIL_WAITFAIL if the wait(2) syscall failed unexpectedly.
+ *         @ref GHR_JAIL_NONZEROEXIT if the process exited with a non-zero exit code. Use @ref ghr_exitcode to retrieve the exit code.
+ *         @ref GHR_JAIL_KILLEDSIG if the process was killed by a signal. Use @ref ghr_signalno to retrieve the signal number.
+ */
+gh_result gh_sandbox_wait(gh_sandbox * sandbox);
+
+/** @brief Reads sandbox options from a file pointed to by a file descriptor.
+ *
+ * @param fd          File descriptor pointing to the file containing the sandbox options structure.
+ * @param out_options Pointer to the uninitialized sandbox options structure.
+ */
+gh_result gh_sandboxoptions_readfrom(int fd, gh_sandboxoptions * out_options);
+
+#endif

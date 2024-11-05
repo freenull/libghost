@@ -1,0 +1,5 @@
+/build
+/include/ghost/generated
+/src/ghost/generated
+/compile_commands.json
+/.cache
