@@ -46,7 +46,7 @@ target_link_libraries(ghost-jail PUBLIC libghost-nojail)
 
 add_custom_command(
     OUTPUT "${PROJECT_BINARY_DIR}/embedded_jail.c"
-    COMMAND xxd -n gh_embeddedjail_exe_data -i "${PROJECT_BINARY_DIR}/ghost-jail" > "${PROJECT_BINARY_DIR}/embedded_jail.c"
+    COMMAND xxd -i "${PROJECT_BINARY_DIR}/ghost-jail" | sed "'s/int .*_len/int gh_embeddedjail_exe_data_len/g;s/char .*\\[\\]/char gh_embeddedjail_exe_data[]/'" > "${PROJECT_BINARY_DIR}/embedded_jail.c"
     DEPENDS ${jail_src} ${jail_inc}
 )
 add_custom_target(ghost-embedded-jail DEPENDS "${PROJECT_BINARY_DIR}/embedded_jail.c" ghost-jail)

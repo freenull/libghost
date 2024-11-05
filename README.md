@@ -8,8 +8,9 @@ Result of engineering thesis at the Wrocław University of Science and Technolog
 
 * Linux kernel 3.5+ (with seccomp-bpf)
 * CMake 3.27+
-* Python3 (for build-time tools)
+* Python3.11+ (for build-time tools)
 * C compiler toolchain
+* xxd (comes with Vim, alternative implementation is okay as long as it supports the `-i` option)
 
 ## Building
 
