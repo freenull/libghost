@@ -16,8 +16,11 @@ add_custom_command(
 )
 add_custom_target(ghost-enum-error DEPENDS ${enum_error_out})
 
-file(GLOB_RECURSE ghost_src "src/ghost/*.c")
-file(GLOB_RECURSE ghost_inc "include/ghost/*.h")
+file(GLOB ghost_src "src/ghost/*.c")
+file(GLOB ghost_inc "include/ghost/*.h")
+
+list(APPEND ghost_src ${enum_error_out_source})
+list(APPEND ghost_inc ${enum_error_out_header})
 
 add_library(libghost-nojail SHARED "${ghost_src}")
 add_dependencies(libghost-nojail ghost-enum-error)
