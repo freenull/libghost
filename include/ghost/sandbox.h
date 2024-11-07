@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <ghost/result.h>
+#include <ghost/ipc.h>
 
 #define GHOST_SANDBOXOPTIONS_NAME_MAX 256
 
@@ -11,11 +12,15 @@
 typedef struct {
     char name[GHOST_SANDBOXOPTIONS_NAME_MAX];
     size_t memory_limit;
+
+    /* @brief File descriptor of jail IPC socket. Not intended to be set by user, will be reset during sandbox spawn. */
+    int jail_ipc_sockfd;
 } gh_sandboxoptions;
 
 typedef struct {
     pid_t pid;
     gh_sandboxoptions options;
+    gh_ipc ipc;
 } gh_sandbox;
 
 /** @brief Constructs a sandbox object.
@@ -46,5 +51,15 @@ gh_result gh_sandbox_wait(gh_sandbox * sandbox);
  * @param out_options Pointer to the uninitialized sandbox options structure.
  */
 gh_result gh_sandboxoptions_readfrom(int fd, gh_sandboxoptions * out_options);
+
+/** @brief Destroys a sandbox object.
+ *
+ * @par Memory allocated for the object is **not** freed by this function.
+ *
+ * @param sandbox Pointer to the sandbox object.
+ *
+ * @return Result code.
+ */
+gh_result gh_sandbox_dtor(gh_sandbox * sandbox);
 
 #endif

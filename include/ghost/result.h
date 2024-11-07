@@ -28,8 +28,8 @@
 typedef uint32_t gh_result;
 
 #define _ghr_normalizeerrno(value) ((value >= 0xFFFF) ? 0xFFFF : (value))
-#define ghr_errno(ctx) ((_ghr_normalizeerrno(errno) << 16) | (ctx))
-#define ghr_errnoval(ctx, value) ((_ghr_normalizeerrno(value) << 16) | (ctx))
+#define ghr_errno(ctx) ((gh_result)((_ghr_normalizeerrno(errno) << 16) | (ctx)))
+#define ghr_errnoval(ctx, value) ((gh_result)((_ghr_normalizeerrno(value) << 16) | (ctx)))
 
 #define ghr_frag_errno(value) ((int)(((value) >> 16) & 0xFFFF))
 #define ghr_frag_context(value) ((gh_error)((value) & 0xFFFF))
@@ -41,18 +41,16 @@ typedef uint32_t gh_result;
     do { \
         fprintf(stderr, "[%s:%d] Fatal error: ", __FILE__, __LINE__); \
         ghr_fputs(stderr, value); \
-        raise(SIGABRT); \
-        exit(1); \
+        exit(3); \
     } while (0)
 
 #define ghr_assert(value) \
     do { \
-        gh_result __ghr_assert_value = (value); \
-        if (__ghr_assert_value != GHR_OK) { \
+        gh_result ghr_assert_value__generated = (value); \
+        if (ghr_assert_value__generated != GHR_OK) { \
             fprintf(stderr, "[%s:%d] Assertion failed (error result): '" #value "': ", __FILE__, __LINE__); \
-            ghr_fputs(stderr, __ghr_assert_value); \
-            raise(SIGABRT); \
-            exit(1); \
+            ghr_fputs(stderr, ghr_assert_value__generated); \
+            exit(3); \
         } \
     } while (0)
 
@@ -60,17 +58,17 @@ typedef uint32_t gh_result;
 #define ghr_context_has_signalno(ctx)((ctx) == GHR_JAIL_KILLEDSIG)
 
 #define ghr_exitcode(value) ({ \
-        gh_result __ghr_result_value = (value); \
+        gh_result ghr_result_value__generated = (value); \
         \
-        (ghr_context_has_exitcode(ghr_frag_context(__ghr_result_value))) \
+        (ghr_context_has_exitcode(ghr_frag_context(ghr_result_value__generated))) \
         ? ghr_frag_errno(value) \
         : -1; \
     })
 
 #define ghr_signalno(value) ({ \
-        gh_result __ghr_result_value = (value); \
+        gh_result ghr_result_value__generated = (value); \
         \
-        (ghr_context_has_signalno(ghr_frag_context(__ghr_result_value))) \
+        (ghr_context_has_signalno(ghr_frag_context(ghr_result_value__generated))) \
         ? ghr_frag_errno(value) \
         : -1; \
     })

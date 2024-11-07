@@ -18,7 +18,7 @@ gh_result gh_embeddedjail_createfd(int * out_fd) {
     int fd = memfd_create("gh-embeddedjail", MFD_CLOEXEC);
     if (fd < 0) return ghr_errno(GHR_EMBEDDEDJAIL_CREATEFAIL);
 
-    int write_res = write(fd, gh_embeddedjail_exe_data, gh_embeddedjail_exe_data_len);
+    ssize_t write_res = write(fd, gh_embeddedjail_exe_data, gh_embeddedjail_exe_data_len);
     if (write_res < 0) return ghr_errno(GHR_EMBEDDEDJAIL_WRITEFAIL);
     if (write_res != gh_embeddedjail_exe_data_len) return GHR_EMBEDDEDJAIL_WRITETRUNC;
 
@@ -38,16 +38,22 @@ gh_result gh_embeddedjail_exec(const char * name, int options_fd) {
     if (options_fd_str_len < 0) return ghr_errno(GHR_SANDBOX_OPTIONSFDCONVERTFAIL);
 
     char options_fd_str[options_fd_str_len + 1];
-    int snprintf_res = snprintf(options_fd_str, options_fd_str_len + 1, "%d", options_fd);
+    int snprintf_res = snprintf(options_fd_str, (unsigned long)options_fd_str_len + 1, "%d", options_fd);
     if (snprintf_res < 0) return ghr_errno(GHR_SANDBOX_OPTIONSFDCONVERTFAIL);
 
-    char * const argv[] = {
-        (char * const)name,
+    const char * const argv[] = {
+        name,
         options_fd_str,
         NULL
     };
 
-    int exec_res = fexecve(fd, argv, (char * const * const)environ);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
+    // RATIONALE: The cast is okay, exec replaces the entire address space anyway.
+
+    /* int exec_res = execve("/home/db/Projects/C/ghost/build/ghost-jail", (char * const *)argv, (char * const * const)environ); */
+    int exec_res = fexecve(fd, (char * const *)argv, (char * const * const)environ);
+#pragma GCC diagnostic pop
     if (exec_res < 0) return ghr_errno(GHR_EMBEDDEDJAIL_EXECFAIL);
 
     __builtin_unreachable();

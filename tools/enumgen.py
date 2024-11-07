@@ -45,6 +45,8 @@ with open(args.csv, "r") as csv_f:
 
     first = True
     for row in reader:
+        if len(row) == 0: continue
+
         if not args.first_row and first:
             first = False
             continue

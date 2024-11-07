@@ -2,6 +2,38 @@ cmake_minimum_required(VERSION 3.27)
 project(ghost VERSION 1.0.0 DESCRIPTION "Safe Lua runtime based on LuaJIT")
 include(GNUInstallDirs)
 include(CTest)
+include(CMakeParseArguments)
+
+function(GhostAddCFlags)
+    string (REPLACE ";" " " flag_str "${ARGN}")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${flag_str}" PARENT_SCOPE)
+endfunction()
+
+if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
+    GhostAddCFlags(-Weverything)
+elseif(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    GhostAddCFlags(-Wextra -Wall)
+else()
+    message(FATAL_ERROR "Unsupported compiler: ${CMAKE_C_COMPILER_ID} (${CMAKE_C_COMPILER})")
+endif()
+
+GhostAddCFlags(-std=c11)
+GhostAddCFlags(-Werror)
+
+GhostAddCFlags(-Wno-declaration-after-statement)
+# RATIONALE: Project supports C11+.
+GhostAddCFlags(-Wno-unsafe-buffer-usage)
+# RATIONALE: Intended for C++. Triggers on simple access to stack array in C. Bogus.
+GhostAddCFlags(-Wno-gnu-statement-expression-from-macro-expansion)
+# RATIONALE: Project currently only supports compilers that support GNU statement expressions.
+GhostAddCFlags(-Wno-padded)
+# RATIONALE: Padding added by the compiler is treated carefully and is not an error.
+GhostAddCFlags(-Wno-vla)
+# RATIONALE: Project currently only supports compilers with VLA support.
+GhostAddCFlags(-Wno-covered-switch-default)
+# RATIONALE: Warning concerns default cases when all cases have been covered. Not only is this harmless, the default case could still be triggered by casts of bogus values to an enum.
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ")
 
 set(enumgen "tools/enumgen.py")
 set(enum_error_src "intermediate/gh_error.csv")
@@ -16,6 +48,45 @@ add_custom_command(
 )
 add_custom_target(ghost-enum-error DEPENDS ${enum_error_out})
 
+function(GhostCodegenTarget target_name)
+    set(codegen "${PROJECT_SOURCE_DIR}/tools/codegen.py")
+
+    cmake_parse_arguments(
+        args
+        ""
+        "INPUT"
+        "DEPENDS;OUTPUT"
+        ${ARGN}
+    )
+
+    set(output_path_list "")
+    set(output_args "")
+    foreach(output_mapping ${args_OUTPUT})
+        string(REGEX REPLACE "^[^=]*=" "" output_path ${output_mapping})
+        string(REGEX REPLACE "(^[^=]*)=.*" "\\1" output_key ${output_mapping})
+
+        list(APPEND output_args "-o${output_key}=${output_path}")
+
+        list(APPEND output_path_list ${output_path})
+    endforeach()
+
+    add_custom_command(
+        OUTPUT ${output_path_list}
+        COMMAND "${codegen}" "${PROJECT_SOURCE_DIR}/${args_INPUT}" ${output_args}
+        DEPENDS ${args_DEPENDS} "${PROJECT_SOURCE_DIR}/${args_INPUT}" "${codegen}"
+    )
+
+    add_custom_target(${target_name} DEPENDS ${output_path_list})
+endfunction()
+
+GhostCodegenTarget(
+    ghost-enum-msgtype
+    INPUT intermediate/ipc_msgtype.py
+    OUTPUT
+        "header=${PROJECT_SOURCE_DIR}/include/ghost/generated/gh_ipcmsg.h"
+        "source=${PROJECT_SOURCE_DIR}/src/ghost/generated/gh_ipcmsg.c"
+)
+
 file(GLOB ghost_src "src/ghost/*.c")
 file(GLOB ghost_inc "include/ghost/*.h")
 
@@ -23,7 +94,7 @@ list(APPEND ghost_src ${enum_error_out_source})
 list(APPEND ghost_inc ${enum_error_out_header})
 
 add_library(libghost-nojail SHARED "${ghost_src}")
-add_dependencies(libghost-nojail ghost-enum-error)
+add_dependencies(libghost-nojail ghost-enum-error ghost-enum-msgtype)
 set_target_properties(libghost-nojail PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(libghost-nojail PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 set_target_properties(libghost-nojail PROPERTIES OUTPUT_NAME "ghost")
@@ -44,10 +115,12 @@ add_executable(ghost-jail "${jail_src}")
 target_include_directories(ghost-jail PRIVATE include)
 target_link_libraries(ghost-jail PUBLIC libghost-nojail)
 
+set(cembed "${PROJECT_SOURCE_DIR}/tools/cembed.py")
+
 add_custom_command(
     OUTPUT "${PROJECT_BINARY_DIR}/embedded_jail.c"
-    COMMAND xxd -i "${PROJECT_BINARY_DIR}/ghost-jail" | sed "'s/int .*_len/int gh_embeddedjail_exe_data_len/g;s/char .*\\[\\]/char gh_embeddedjail_exe_data[]/'" > "${PROJECT_BINARY_DIR}/embedded_jail.c"
-    DEPENDS ${jail_src} ${jail_inc}
+    COMMAND "${cembed}" "${PROJECT_BINARY_DIR}/ghost-jail" -e -n gh_embeddedjail_exe_data > "${PROJECT_BINARY_DIR}/embedded_jail.c"
+    DEPENDS ${jail_src} ${jail_inc} ${cembed}
 )
 add_custom_target(ghost-embedded-jail DEPENDS "${PROJECT_BINARY_DIR}/embedded_jail.c" ghost-jail)
 

@@ -3,6 +3,8 @@
 
 #include <ghost/sandbox.h>
 
+#define GH_JAIL_HELLOTIMEOUTMS 1000 * 5
+
 /** @brief Global sandbox options.
  *
  * @par This structure is filled in by reading from a memory file prepared by the library when executing the jail, passed in through `argv[1]`.

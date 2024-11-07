@@ -1,14 +1,28 @@
 EnumKey,Value,Description
 OK,0,Success (no error)
+
+ALLOC_ALLOCFAIL,,Allocator failed allocating memory
+ALLOC_REALLOCFAIL,,Allocator failed reallocating memory
+ALLOC_FREEFAIL,,Allocator failed releasing memory
+ALLOC_INVALIDOUTERPTR,,Invalid pointer argument (outer) passed to allocator function
+ALLOC_INVALIDPTR,,Invalid pointer argument (inner) passed to allocator function
+ALLOC_INVALIDSIZE,,Invalid size passed to allocator function
+
 EMBEDDEDJAIL_CREATEFAIL,,Failed creating memory file for embedded jail executable
 EMBEDDEDJAIL_WRITEFAIL,,Failed writing embedded jail executable to memory file - write failed
 EMBEDDEDJAIL_WRITETRUNC,,Failed writing embedded jail executable to memory file - written data was truncated
 EMBEDDEDJAIL_UNAVAILABLE,,Jail executable has not been embedded in the shared library
 EMBEDDEDJAIL_EXECFAIL,,Failed executing jail executable
+
 SANDBOX_OPTIONSFDCONVERTFAIL,,Failed converting sandbox options file descriptor to string
 SANDBOX_OPTIONSREADFAIL,,Failed reading sandbox options from file descriptor
+SANDBOX_CLEANIPCFAIL,,Error occured while trying to destroy IPC object as part of recovery from another error during sandbox initialization
+SANDBOX_KILLCHILDFAIL,,Error occured while trying to kill jail process as part of recovery from another error during sandbox initialization
+SANDBOX_CLOSESOCKFAIL,,Failed closing one end of the IPC socket while initializing sandbox
+
 JAIL_OPTIONSMEMFAIL,,Failed creating memory file containing sandbox options
 JAIL_OPTIONSWRITEFAIL,,Failed writing to memory file containing sandbox options
+JAIL_OPTIONSSWRITETRUNC,,Failed writing to memory file containing sandbox options - file was truncated
 JAIL_OPTIONSSEEKFAIL,,Failed seeking memory file containing sandbox options
 JAIL_NOOPTIONSFD,,Jail process was not provided a sandbox options structure file descriptor
 JAIL_OPTIONSFDPARSEFAIL,,Failed parsing sandbox options file descriptor argument
@@ -18,4 +32,21 @@ JAIL_SECCOMPFAIL,,Installing seccomp filter in jail process failed
 JAIL_WAITFAIL,,Failed waiting for child process PID
 JAIL_NONZEROEXIT,,Jail process exitted with non-zero status code
 JAIL_KILLEDSIG,,Jail process was killed with signal
+JAIL_UNKNOWNMESSAGE,,Received unknown message
+JAIL_MULTIHELLO,,Received duplicate hello message
+JAIL_CLOSEFDFAIL,,Failed closing IPC socket fd in jail pool process after POOLNEW message
+JAIL_UNSUPPORTEDMSG,,Received message is explicitly not supported by this jail/subjail process
+
+IPC_SOCKCREATEFAIL,,Failed creating IPC socket
+IPC_MSGNEWFAIL,,Failed allocating memory for message object
+IPC_CLOSEFDFAIL,,Failed closing socket file descriptor while destroying IPC object
+IPC_SENDMSGFAIL,,Failed sending message over IPC socket
+IPC_POLLMSGFAIL,,Failed polling for message in IPC socket
+IPC_RECVMSGTIMEOUT,,Timed out waiting to receive message over IPC socket
+IPC_RECVMSGFAIL,,Failed receiving message over IPC socket
+IPC_RECVMSGTRUNC,,Message received over IPC socket was too long
+IPC_RECVTOOSMALL,,Message received over IPC socket was impossibly small
+IPC_NOCONTROLDATA,,IPC message should have container control header, but doesn't
+IPC_NOCONTROLMSG,,Attempted to send message with control data from an IPC object not in controller mode
+
 UNKNOWN,,Unknown error

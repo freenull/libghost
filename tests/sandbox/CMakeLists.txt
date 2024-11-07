@@ -1,1 +1,3 @@
-GhostTest(sandbox-spawn spawn.c)
+GhostTestNamespace(sandbox)
+
+GhostTest(spawn_and_wait)

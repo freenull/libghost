@@ -14,7 +14,6 @@ Currently, only Linux is supported.
 * CMake 3.27+
 * Python3.11+ (for build-time tools)
 * C compiler toolchain
-* xxd (comes with Vim, alternative implementation is okay as long as it supports the `-i` option)
 
 ## Building
 
