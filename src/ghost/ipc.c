@@ -172,7 +172,8 @@ gh_result gh_ipc_recv(gh_ipc * ipc, gh_ipcmsg * msg, int timeout_ms) {
 gh_result gh_ipc_call(gh_ipc * ipc, const char * name, size_t argc, gh_ipcmsg_functioncall_arg * args, void * return_arg, size_t return_arg_size) {
     gh_ipcmsg_functioncall funccall = {0};
     funccall.type = GH_IPCMSG_FUNCTIONCALL;
-    strncpy(funccall.name, name, GH_IPCMSG_FUNCTIONCALL_MAXNAME);
+    strncpy(funccall.name, name, GH_IPCMSG_FUNCTIONCALL_MAXNAME - 1);
+    funccall.name[GH_IPCMSG_FUNCTIONCALL_MAXNAME - 1] = '\0';
     funccall.arg_count = argc;
     if (funccall.arg_count > GH_IPCMSG_FUNCTIONCALL_MAXARGS) {
         funccall.arg_count = GH_IPCMSG_FUNCTIONCALL_MAXARGS;
