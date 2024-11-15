@@ -36,6 +36,10 @@ GhostAddCFlags(-Wno-class-varargs)
 # RATIONALE: We are not using C++, and there are no classes. This causes issues when passing structs through varargs, which is fine in C.
 GhostAddCFlags(-Wno-disabled-macro-expansion)
 # RATIONALE: This is well documented and expected behavior. It triggers on certain standard macros like SOCK_DGRAM.
+GhostAddCFlags(-Wno-error=unused-variable)
+# RATIONALE: Creates issues when the variable is used in an assert(), which is not compiled in at all in release mode.
+GhostAddCFlags(-Wno-error=unused-function)
+# RATIONALE: Creates issues when the function is used in an assert(), which is not compiled in at all in release mode.
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ")
 
