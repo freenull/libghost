@@ -32,6 +32,10 @@ GhostAddCFlags(-Wno-vla)
 # RATIONALE: Project currently only supports compilers with VLA support.
 GhostAddCFlags(-Wno-covered-switch-default)
 # RATIONALE: Warning concerns default cases when all cases have been covered. Not only is this harmless, the default case could still be triggered by casts of bogus values to an enum.
+GhostAddCFlags(-Wno-class-varargs)
+# RATIONALE: We are not using C++, and there are no classes. This causes issues when passing structs through varargs, which is fine in C.
+GhostAddCFlags(-Wno-disabled-macro-expansion)
+# RATIONALE: This is well documented and expected behavior. It triggers on certain standard macros like SOCK_DGRAM.
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ")
 

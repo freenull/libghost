@@ -93,7 +93,7 @@ gh_result gh_ipc_send(gh_ipc * ipc, gh_ipcmsg * msg, size_t msg_size) {
     msgh.msg_control = NULL;
     msgh.msg_controllen = 0;
 
-    char cmsg_buf[CMSG_SPACE(GH_IPCMSG_CDATAMAXSIZE)];
+    char cmsg_buf[CMSG_SPACE(GH_IPCMSG_CDATAMAXSIZE)] = {0};
 
     gh_result res = prepare_cmsg(ipc, msg, &msgh, cmsg_buf);
     if (ghr_iserr(res)) return res;

@@ -54,6 +54,17 @@ typedef uint32_t gh_result;
         } \
     } while (0)
 
+#define ghr_asserterr(ctx, value) \
+    do { \
+        gh_result ghr_assert_value__generated = (value); \
+        gh_error ghr_ctx__generated = (ctx); \
+        if (!ghr_is(ghr_assert_value__generated, ghr_ctx__generated)) { \
+            fprintf(stderr, "[%s:%d] Assertion failed (expected result %s, got %s): '" #value "': ", __FILE__, __LINE__, gh_error_name(ghr_ctx__generated), gh_error_name(ghr_frag_context(ghr_assert_value__generated))); \
+            ghr_fputs(stderr, ghr_assert_value__generated); \
+            exit(3); \
+        } \
+    } while (0)
+
 #define ghr_context_has_exitcode(ctx)((ctx) == GHR_JAIL_NONZEROEXIT)
 #define ghr_context_has_signalno(ctx)((ctx) == GHR_JAIL_KILLEDSIG)
 
@@ -74,6 +85,7 @@ typedef uint32_t gh_result;
     })
 
 #define ghr_is(value, ctx) (ghr_frag_context(value) == (ctx))
+#define ghr_isnot(value, ctx) (!(ghr_frag_context(value) == (ctx)))
 
 const char * ghr_context(gh_result value);
 const char * ghr_error(gh_result value);

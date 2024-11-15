@@ -1,3 +1,3 @@
 GhostTestNamespace(sandbox)
 
-GhostTest(spawn_and_wait)
+GhostTest(spawn_and_wait VALGRINDWORKAROUND)

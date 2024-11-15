@@ -10,7 +10,7 @@ Currently, only Linux is supported.
 
 ## Requirements
 
-* Linux kernel 3.5+ (with seccomp-bpf)
+* Linux kernel 5.1+ (requires seccomp-bpf, memfd and `F_SEAL_FUTURE_WRITE`)
 * CMake 3.27+
 * Python3.11+ (for build-time tools)
 * C compiler toolchain

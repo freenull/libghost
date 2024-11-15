@@ -11,10 +11,12 @@ int main(void) {
     gh_sandbox sandbox;
     gh_result res = GHR_OK;
 
-    res = gh_sandbox_ctor(&sandbox, (gh_sandboxoptions) {
-        .name = "ghost-test-sandbox",
-        .memory_limit = GH_SANDBOX_NOMEMLIMIT
-    });
+    gh_sandboxoptions options = {0};
+    strcpy(options.name, "ghost-test-sandbox");
+    options.memory_limit = GH_SANDBOX_NOMEMLIMIT;
+
+
+    res = gh_sandbox_ctor(&sandbox, options);
     ghr_assert(res);
 
     printf("send %d\n", sandbox.ipc.sockfd);

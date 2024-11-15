@@ -9,6 +9,9 @@
 #include <ghost/alloc.h>
 
 #define GH_IPCMSG_MAXSIZE (1024 * 10)
+#define GH_IPCMSG_BUFFER(name) \
+    char name ## __backing_buf[GH_IPCMSG_MAXSIZE]; \
+    gh_ipcmsg * name = (gh_ipcmsg*)name ## __backing_buf
 #define GH_IPCMSG_CDATAMAXSIZE sizeof(int)
 
 typedef enum {
@@ -25,7 +28,7 @@ typedef enum {
     GH_IPCMSG_HELLO,
     GH_IPCMSG_QUIT,
     GH_IPCMSG_NEWSUBJAIL,
-    GH_IPCMSG_SUBJAILALIVE
+    GH_IPCMSG_SUBJAILALIVE,
 } gh_ipcmsg_type;
 
 typedef struct {
@@ -102,6 +105,7 @@ gh_result gh_ipc_send(gh_ipc * ipc, gh_ipcmsg * msg, size_t msg_size);
  * @param ipc         Pointer to the IPC object.
  * @param msg         Pointer to the buffer that will contain the message.
  *                    Must be a block of memory of size at least GH_IPCMSG_MAXSIZE
+ *                    (use @ref GH_IPCMSG_BUFFER).
  * @param timeout_ms  Timeout in milliseconds.
  *                    If reached before a message is available on the socket, the function will return @ref GHR_IPC_RECVMSGTIMEOUT.
  *                    If 0, there is no timeout.

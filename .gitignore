@@ -3,3 +3,5 @@
 /src/ghost/generated
 /compile_commands.json
 /.cache
+/docs
+vgcore.*

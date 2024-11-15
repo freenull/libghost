@@ -1,9 +1,19 @@
 #include <stdlib.h>
 #include <ghost/alloc.h>
 
+gh_result gh_alloc_dtor(gh_alloc * alloc) {
+    return alloc->func(NULL, 0, 0, alloc->userdata);
+}
+
 static gh_result default_allocator(void ** ptr, size_t old_size, size_t new_size, void * userdata) {
     (void)old_size;
     (void)userdata;
+
+    if (ptr == NULL && old_size == 0 && new_size == 0) {
+        // dtor callback (default alloc does nothing)
+
+        return GHR_OK;
+    }
 
     if (ptr == NULL) {
         void * new_ptr = malloc(new_size);

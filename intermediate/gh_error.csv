@@ -8,6 +8,9 @@ ALLOC_INVALIDOUTERPTR,,Invalid pointer argument (outer) passed to allocator func
 ALLOC_INVALIDPTR,,Invalid pointer argument (inner) passed to allocator function
 ALLOC_INVALIDSIZE,,Invalid size passed to allocator function
 
+DYNAMICARRAY_MAXCAPACITY,,Maximum capacity of dynamic array reached
+DYNAMICARRAY_OUTOFBOUNDS,,Dynamic array index out of bounds
+
 EMBEDDEDJAIL_CREATEFAIL,,Failed creating memory file for embedded jail executable
 EMBEDDEDJAIL_WRITEFAIL,,Failed writing embedded jail executable to memory file - write failed
 EMBEDDEDJAIL_WRITETRUNC,,Failed writing embedded jail executable to memory file - written data was truncated
@@ -48,5 +51,27 @@ IPC_RECVMSGTRUNC,,Message received over IPC socket was too long
 IPC_RECVTOOSMALL,,Message received over IPC socket was impossibly small
 IPC_NOCONTROLDATA,,IPC message should have container control header, but doesn't
 IPC_NOCONTROLMSG,,Attempted to send message with control data from an IPC object not in controller mode
+
+SHM_BLOCKHARDLIMIT,,Reached hard limit of SHM blocks
+SHM_BLOCKSOFTLIMIT,,Reached soft limit of SHM blocks
+SHM_UNMAPPEDLOCAL,,No SHM block mapped for local pointer
+SHM_UNMAPPEDREMOTE,,No SHM block mapped for remote address
+SHM_NOREMOTE,,Remote address hasn't been mapped yet for this SHM block
+SHM_INVALIDOFFSET,,Invalid SHM pointer/address offset
+SHM_MEMFDFAIL,,Failed creating anonymous memory file for SHM
+SHM_TRUNCATEFAIL,,Failed extending SHM anonymous memory file to desired size
+SHM_MMAPFAIL,,Failed mapping SHM block into memory
+SHM_MUNMAPFAIL,,Failed unmapping SHM block from memory
+SHM_ERRCLOSEFDFAIL,,Failed closing SHM memory file descriptor while attempting to recover from another error
+SHM_ERRMUNMAPFAIL,,Failed unmapping SHM block from memory while attempting to recover from another error
+SHM_SEALFAIL,,Failed sealing SHM backing memory file
+
+TS_MISSINGTYPE,,No type with specified name found in the typesystem
+TS_DUPLICATETYPE,,Attempted to add type with a name that already exists in the typesystem
+TS_INVALIDTYPE,,Type of kind GH_TSTYPE_INVALID passed to function expecting valid type
+TS_EMPTYNAME,,Type may not have empty name
+TS_ARRAYTOOBIG,,Static array size is too large
+
+TEST_GENERIC,,Generic error from test case
 
 UNKNOWN,,Unknown error

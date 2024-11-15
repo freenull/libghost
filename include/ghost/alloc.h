@@ -17,6 +17,8 @@ static inline void gh_alloc_ctor(gh_alloc * alloc, gh_alloc_func func, void * us
     alloc->userdata = userdata;
 }
 
+gh_result gh_alloc_dtor(gh_alloc * alloc);
+
 gh_alloc gh_alloc_default(void);
 gh_result gh_alloc_new(gh_alloc * alloc, void ** out_ptr, size_t size);
 gh_result gh_alloc_delete(gh_alloc * alloc, void ** ptr, size_t old_size);
