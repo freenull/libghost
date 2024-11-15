@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <ghost/alloc.h>
 #include <ghost/dynamic_array.h>
 

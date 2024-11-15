@@ -1,5 +1,4 @@
 #include <string.h>
-#include <assert.h>
 #include <ghost/result.h>
 #include <ghost/typesystem.h>
 

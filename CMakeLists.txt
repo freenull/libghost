@@ -11,6 +11,17 @@ endfunction()
 
 if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
     GhostAddCFlags(-Weverything)
+
+    GhostAddCFlags(-Wno-disabled-macro-expansion)
+    # RATIONALE: This is well documented and expected behavior. It triggers on certain standard macros like SOCK_DGRAM.
+    GhostAddCFlags(-Wno-class-varargs)
+    # RATIONALE: We are not using C++, and there are no classes. This causes issues when passing structs through varargs, which is fine in C.
+    GhostAddCFlags(-Wno-covered-switch-default)
+    # RATIONALE: Warning concerns default cases when all cases have been covered. Not only is this harmless, the default case could still be triggered by casts of bogus values to an enum.
+    GhostAddCFlags(-Wno-gnu-statement-expression-from-macro-expansion)
+    # RATIONALE: Project currently only supports compilers that support GNU statement expressions.
+    GhostAddCFlags(-Wno-unsafe-buffer-usage)
+    # RATIONALE: Intended for C++. Triggers on simple access to stack array in C. Bogus.
 elseif(CMAKE_C_COMPILER_ID STREQUAL "GNU")
     GhostAddCFlags(-Wextra -Wall)
 else()
@@ -22,20 +33,10 @@ GhostAddCFlags(-Werror)
 
 GhostAddCFlags(-Wno-declaration-after-statement)
 # RATIONALE: Project supports C11+.
-GhostAddCFlags(-Wno-unsafe-buffer-usage)
-# RATIONALE: Intended for C++. Triggers on simple access to stack array in C. Bogus.
-GhostAddCFlags(-Wno-gnu-statement-expression-from-macro-expansion)
-# RATIONALE: Project currently only supports compilers that support GNU statement expressions.
 GhostAddCFlags(-Wno-padded)
 # RATIONALE: Padding added by the compiler is treated carefully and is not an error.
 GhostAddCFlags(-Wno-vla)
 # RATIONALE: Project currently only supports compilers with VLA support.
-GhostAddCFlags(-Wno-covered-switch-default)
-# RATIONALE: Warning concerns default cases when all cases have been covered. Not only is this harmless, the default case could still be triggered by casts of bogus values to an enum.
-GhostAddCFlags(-Wno-class-varargs)
-# RATIONALE: We are not using C++, and there are no classes. This causes issues when passing structs through varargs, which is fine in C.
-GhostAddCFlags(-Wno-disabled-macro-expansion)
-# RATIONALE: This is well documented and expected behavior. It triggers on certain standard macros like SOCK_DGRAM.
 GhostAddCFlags(-Wno-error=unused-variable)
 # RATIONALE: Creates issues when the variable is used in an assert(), which is not compiled in at all in release mode.
 GhostAddCFlags(-Wno-error=unused-function)

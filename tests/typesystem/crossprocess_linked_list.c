@@ -2,7 +2,6 @@
 #include <errno.h>
 #include <stddef.h>
 #include <string.h>
-#include <assert.h>
 #include <sys/uio.h>
 #include <sys/wait.h>
 #include <sys/socket.h>

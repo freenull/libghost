@@ -1,7 +1,6 @@
 #define _GNU_SOURCE
 #include <stddef.h>
 #include <string.h>
-#include <assert.h>
 #include <ghost/result.h>
 #include <ghost/typesystem.h>
 

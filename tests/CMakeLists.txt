@@ -21,6 +21,8 @@ function(GhostTest name)
     add_executable(test-${__ghost_test_namespace}-${name} ${src})
     target_link_libraries(test-${__ghost_test_namespace}-${name} libghost)
 
+    target_compile_options(test-${__ghost_test_namespace}-${name} PUBLIC -include ${CMAKE_SOURCE_DIR}/tests/test.h)
+
     if (${GHTEST_VALGRINDWORKAROUND})
         target_compile_definitions(test-${__ghost_test_namespace}-${name} PUBLIC GHOST_JAIL_EXE_PATH="$<TARGET_FILE:ghost-jail>")
     endif()

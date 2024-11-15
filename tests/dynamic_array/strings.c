@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <string.h>
 #include <ghost/result.h>
 #include <ghost/alloc.h>
