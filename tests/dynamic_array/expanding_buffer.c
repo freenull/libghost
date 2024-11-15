@@ -1,6 +1,5 @@
 #define _GNU_SOURCE
 #include <fcntl.h>
-#include <assert.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <ghost/alloc.h>
