@@ -12,6 +12,8 @@ endfunction()
 if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
     GhostAddCFlags(-Weverything)
 
+    GhostAddCFlags(-Wno-unused-macros)
+    # RATIONALE: Clang sometimes doesn't like _GNU_SOURCE with this warning enabled.
     GhostAddCFlags(-Wno-disabled-macro-expansion)
     # RATIONALE: This is well documented and expected behavior. It triggers on certain standard macros like SOCK_DGRAM.
     GhostAddCFlags(-Wno-class-varargs)
@@ -22,6 +24,8 @@ if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
     # RATIONALE: Project currently only supports compilers that support GNU statement expressions.
     GhostAddCFlags(-Wno-unsafe-buffer-usage)
     # RATIONALE: Intended for C++. Triggers on simple access to stack array in C. Bogus.
+    GhostAddCFlags(-Wno-extra-semi-stmt)
+    # RATIONALE: Messes with macros that can't be done any other way than with a useless semicolon.
 elseif(CMAKE_C_COMPILER_ID STREQUAL "GNU")
     GhostAddCFlags(-Wextra -Wall)
 else()

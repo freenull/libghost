@@ -1,9 +1,40 @@
+#define _GNU_SOURCE
+#include <unistd.h>
+#include <string.h>
+#include <time.h>
 #include <sys/types.h>
 #include <ghost/ipc.h>
 #include <jail/jail.h>
 #include <jail/subjail.h>
 
 int gh_global_subjail_idx = -1;
+
+static void testcase_1(gh_ipc * ipc) {
+    char arg[] = "Hello, world!";
+    gh_ipcmsg_functioncall_arg args[] = {
+        { .addr = (uintptr_t)arg, .size = sizeof(arg) }
+    };
+
+    ghr_assert(gh_ipc_call(ipc, "print", 1, args, NULL, 0));
+}
+
+static void testcase_2(gh_ipc * ipc) {
+    srand((unsigned int)time(NULL) ^ ((unsigned int)getpid() * 57994513));
+    gh_ipcmsg_functioncall funccall;
+    funccall.type = GH_IPCMSG_FUNCTIONCALL;
+    strcpy(funccall.name, "setbanner");
+    funccall.arg_count = 1;
+
+    char arg[256];
+    snprintf(arg, 256, "Hello, world! Random: %d", rand());
+    gh_ipcmsg_functioncall_arg args[] = {
+        { .addr = (uintptr_t)arg, .size = strlen(arg) + 1 }
+    };
+
+    ghr_assert(gh_ipc_call(ipc, "setbanner", 1, args, NULL, 0));
+
+    ghr_assert(gh_ipc_call(ipc, "printbanner", 0, args, NULL, 0));
+}
 
 static bool message_recv(gh_ipc * ipc, gh_ipcmsg * msg) {
     (void)ipc;
@@ -15,8 +46,20 @@ static bool message_recv(gh_ipc * ipc, gh_ipcmsg * msg) {
         fprintf(stderr, "subjail %d: received request to exit\n", gh_global_subjail_idx);
         return true;
 
+    case GH_IPCMSG_TESTCASE:
+        fprintf(stderr, "subjail %d: running testcase func\n", gh_global_subjail_idx);
+        switch (((gh_ipcmsg_testcase *)msg)->index) {
+            case 1: testcase_1(ipc); break;
+            case 2: testcase_2(ipc); break;
+            default: break;
+        }
+        return false;
+
     case GH_IPCMSG_SUBJAILALIVE: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
     case GH_IPCMSG_NEWSUBJAIL: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
+
+    case GH_IPCMSG_FUNCTIONCALL: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
+    case GH_IPCMSG_FUNCTIONRETURN: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
 
     default:
         fprintf(stderr, "subjail %d: received unknown message of type %d\n", gh_global_subjail_idx, (int)msg->type);
@@ -40,13 +83,13 @@ void gh_subjail_spawn(int sockfd, int parent_pid, gh_ipc * parent_ipc) {
 }
 
 int gh_subjail_main(gh_ipc * ipc, int parent_pid, gh_ipc * parent_ipc) {
-    // Before destroying the parent's IPC and disconnecting from the pool socket,
-    // we send a notification confirming that the subjail is ready
+    ghr_assert(gh_ipc_dtor(parent_ipc));
+
     gh_ipcmsg_subjailalive subjailalive_msg;
     subjailalive_msg.type = GH_IPCMSG_SUBJAILALIVE;
     subjailalive_msg.index = gh_global_subjail_idx;
-    ghr_assert(gh_ipc_send(parent_ipc, (gh_ipcmsg *)&subjailalive_msg, sizeof(gh_ipcmsg_subjailalive)));
-    ghr_assert(gh_ipc_dtor(parent_ipc));
+    subjailalive_msg.pid = getpid();
+    ghr_assert(gh_ipc_send(ipc, (gh_ipcmsg *)&subjailalive_msg, sizeof(gh_ipcmsg_subjailalive)));
 
     gh_result res;
 

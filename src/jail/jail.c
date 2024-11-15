@@ -43,6 +43,10 @@ static bool message_recv(gh_ipc * ipc, gh_ipcmsg * msg) {
         if (close(sockfd) < 0) ghr_fail(GHR_JAIL_CLOSEFDFAIL);
         break;
 
+    case GH_IPCMSG_TESTCASE: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
+    case GH_IPCMSG_FUNCTIONCALL: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
+    case GH_IPCMSG_FUNCTIONRETURN: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
+
     default:
         fprintf(stderr, "jail: received unknown message of type %d\n", (int)msg->type);
         ghr_fail(GHR_JAIL_UNKNOWNMESSAGE);
@@ -121,6 +125,12 @@ int main(int argc, char ** argv) {
 }
 
 gh_result gh_jail_lockdown(gh_sandboxoptions * options) {
+    char * gh_sandbox = getenv("GH_SANDBOX_DISABLED");
+    if (gh_sandbox != NULL && strcmp(gh_sandbox, "1") == 0) {
+        fprintf(stderr, "jail: SANDBOX DISABLED\n");
+        return GHR_OK;
+    }
+
     static const struct sock_filter filter[] = {
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, (offsetof(struct seccomp_data, arch))),
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, AUDIT_ARCH_X86_64, 1, 0),
@@ -183,10 +193,10 @@ gh_result gh_jail_lockdown(gh_sandboxoptions * options) {
         return ghr_errno(GHR_JAIL_NONEWPRIVSFAIL);
     }
 
-    if (options->memory_limit != GH_SANDBOX_NOMEMLIMIT) {
+    if (options->memory_limit_bytes != GH_SANDBOX_NOLIMIT) {
         struct rlimit mem_limit = (struct rlimit){
-            .rlim_cur = options->memory_limit,
-            .rlim_max = options->memory_limit
+            .rlim_cur = options->memory_limit_bytes,
+            .rlim_max = options->memory_limit_bytes
         };
         if (setrlimit(RLIMIT_DATA, &mem_limit) < 0)
         {

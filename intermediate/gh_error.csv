@@ -22,6 +22,14 @@ SANDBOX_OPTIONSREADFAIL,,Failed reading sandbox options from file descriptor
 SANDBOX_CLEANIPCFAIL,,Error occured while trying to destroy IPC object as part of recovery from another error during sandbox initialization
 SANDBOX_KILLCHILDFAIL,,Error occured while trying to kill jail process as part of recovery from another error during sandbox initialization
 SANDBOX_CLOSESOCKFAIL,,Failed closing one end of the IPC socket while initializing sandbox
+SANDBOX_THREADCLOSESOCKFAIL,,Failed closing one end of the IPC socket while initializing thread
+SANDBOX_EXPECTEDSUBJAILALIVE,,Expected to receive SUBJAILALIVE message, but subjail sent a different message
+SANDBOX_THREADRECOVERYKILLFAIL,,Failed killing subjail process as part of recovery process from another error
+SANDBOX_KILLFAIL,,Failed forcefully killing sandbox
+
+THREAD_KILLFAIL,,Failed forcefully killing thread
+THREAD_UNKNOWNMESSAGE,,Received unknown message from thread
+THREAD_UNEXPECTEDMESSAGE,,Received unexpected message from thread
 
 JAIL_OPTIONSMEMFAIL,,Failed creating memory file containing sandbox options
 JAIL_OPTIONSWRITEFAIL,,Failed writing to memory file containing sandbox options
@@ -39,6 +47,7 @@ JAIL_UNKNOWNMESSAGE,,Received unknown message
 JAIL_MULTIHELLO,,Received duplicate hello message
 JAIL_CLOSEFDFAIL,,Failed closing IPC socket fd in jail pool process after POOLNEW message
 JAIL_UNSUPPORTEDMSG,,Received message is explicitly not supported by this jail/subjail process
+JAIL_NORETURN,,Expected to receive FUNCTIONRETURN message after FUNCTIONCALL, but got another message
 
 IPC_SOCKCREATEFAIL,,Failed creating IPC socket
 IPC_MSGNEWFAIL,,Failed allocating memory for message object
@@ -71,6 +80,33 @@ TS_DUPLICATETYPE,,Attempted to add type with a name that already exists in the t
 TS_INVALIDTYPE,,Type of kind GH_TSTYPE_INVALID passed to function expecting valid type
 TS_EMPTYNAME,,Type may not have empty name
 TS_ARRAYTOOBIG,,Static array size is too large
+
+RPC_MISSINGFUNC,,Function does not exist
+RPC_UNEXECUTED,,Frame has not been executed yet
+RPC_EXECUTED,,Frame has already been executed
+RPC_LARGEFRAME,,Size of call frame is above the limit
+RPC_ARGCOPYFAIL,,Failed copying function arguments into call frame
+RPC_RETURNCOPYFAIL,,Failed writing return value into subjail memory
+RPC_FRAMEDISPOSED,,Cannot call disposed frame
+RPC_RETURNSIZE,,Reserved return value memory is too small for return value
+RPC_CLOSEFD,,Failed closing file descriptor returned to subjail from call frame
+
+RPCF_ARG0,,Invalid argument #1
+RPCF_ARG1,,Invalid argument #2
+RPCF_ARG2,,Invalid argument #3
+RPCF_ARG4,,Invalid argument #4
+RPCF_ARG5,,Invalid argument #5
+RPCF_ARG6,,Invalid argument #6
+RPCF_ARG7,,Invalid argument #7
+RPCF_ARG8,,Invalid argument #8
+RPCF_ARG9,,Invalid argument #9
+RPCF_ARG10,,Invalid argument #10
+RPCF_ARG11,,Invalid argument #11
+RPCF_ARG12,,Invalid argument #12
+RPCF_ARG13,,Invalid argument #13
+RPCF_ARG14,,Invalid argument #14
+RPCF_ARG15,,Invalid argument #15
+RPCF_ARG16,,Invalid argument #16
 
 TEST_GENERIC,,Generic error from test case
 

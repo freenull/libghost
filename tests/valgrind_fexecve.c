@@ -14,12 +14,9 @@
 #include <unistd.h>
 #include <ghost/embedded_jail.h>
 
-int fexecve(int fd, char * const * argv, char * const * const environ);
-int fexecve(int fd, char * const * argv, char * const * const environ) {
+int fexecve(int fd, char * const * argv, char * const * const env);
+int fexecve(int fd, char * const * argv, char * const * const env) {
     (void)fd;
-    (void)argv;
-    (void)environ;
-
-    return execve(GHOST_JAIL_EXE_PATH, argv, environ);
+    return execve(GHOST_JAIL_EXE_PATH, argv, env);
 }
 

@@ -39,7 +39,18 @@ gh_result gh_ipc_dtor(gh_ipc * ipc) {
 static gh_result prepare_cmsg(gh_ipc * ipc, gh_ipcmsg * msg, struct msghdr * msgh, char * cmsg_buf) {
     bool is_send = cmsg_buf != NULL;
 
+    int * fd = NULL;
+    bool required = false;
+
     if (msg->type == GH_IPCMSG_NEWSUBJAIL) {
+        fd = &((gh_ipcmsg_newsubjail *)msg)->sockfd;
+        required = true;
+    } else if (msg->type == GH_IPCMSG_FUNCTIONRETURN) {
+        fd = &((gh_ipcmsg_functionreturn *)msg)->fd;
+        required = false;
+    }
+
+    if (fd != NULL && (!is_send || *fd >= 0)) {
         if (is_send && ipc->mode != GH_IPCMODE_CONTROLLER) {
             return GHR_IPC_NOCONTROLMSG;
         }
@@ -52,13 +63,16 @@ static gh_result prepare_cmsg(gh_ipc * ipc, gh_ipcmsg * msg, struct msghdr * msg
         struct cmsghdr * cmsg_header;
         cmsg_header = CMSG_FIRSTHDR(msgh);
 
-        if (cmsg_header == NULL) return GHR_IPC_NOCONTROLDATA;
+        if (cmsg_header == NULL) {
+            if (required || is_send) return GHR_IPC_NOCONTROLDATA;
+            return GHR_OK;
+        }
 
         if (is_send) {
             cmsg_header->cmsg_level = SOL_SOCKET;
             cmsg_header->cmsg_type = SCM_RIGHTS;
             cmsg_header->cmsg_len = CMSG_LEN(sizeof(int));
-            memcpy(CMSG_DATA(cmsg_header), &((gh_ipcmsg_newsubjail*)msg)->sockfd, sizeof(int));
+            memcpy(CMSG_DATA(cmsg_header), fd, sizeof(int));
         } else {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcast-align"
@@ -66,7 +80,7 @@ static gh_result prepare_cmsg(gh_ipc * ipc, gh_ipcmsg * msg, struct msghdr * msg
             // We are exactly the same machine when receiving as when sending,
             // so the alignment will be the same. This cast is okay.
  
-            ((gh_ipcmsg_newsubjail*)msg)->sockfd = *((int*)CMSG_DATA(cmsg_header));
+            *fd = *((int*)CMSG_DATA(cmsg_header));
 #pragma GCC diagnostic pop
         }
     }
@@ -129,7 +143,7 @@ gh_result gh_ipc_recv(gh_ipc * ipc, gh_ipcmsg * msg, int timeout_ms) {
     msgh.msg_control = &control_msg;
     msgh.msg_controllen = sizeof(control_msg);
 
-    if (timeout_ms != 0) {
+    if (timeout_ms != GH_IPC_NOTIMEOUT) {
         struct pollfd fd = {
             .fd = ipc->sockfd,
             .events = POLLIN | POLLPRI,
@@ -153,4 +167,41 @@ gh_result gh_ipc_recv(gh_ipc * ipc, gh_ipcmsg * msg, int timeout_ms) {
     if (ghr_iserr(res)) return res;
 
     return GHR_OK;
+}
+
+gh_result gh_ipc_call(gh_ipc * ipc, const char * name, size_t argc, gh_ipcmsg_functioncall_arg * args, void * return_arg, size_t return_arg_size) {
+    gh_ipcmsg_functioncall funccall = {0};
+    funccall.type = GH_IPCMSG_FUNCTIONCALL;
+    strncpy(funccall.name, name, GH_IPCMSG_FUNCTIONCALL_MAXNAME);
+    funccall.arg_count = argc;
+    if (funccall.arg_count > GH_IPCMSG_FUNCTIONCALL_MAXARGS) {
+        funccall.arg_count = GH_IPCMSG_FUNCTIONCALL_MAXARGS;
+    }
+
+    if (funccall.arg_count > 0) {
+        memcpy(&funccall.args, args, sizeof(gh_ipcmsg_functioncall_arg) * funccall.arg_count);
+    }
+
+    funccall.return_arg.addr = (uintptr_t)return_arg;
+    funccall.return_arg.size = return_arg_size;
+
+    gh_result res = gh_ipc_send(ipc, (gh_ipcmsg*)&funccall, sizeof(gh_ipcmsg_functioncall));
+    if (ghr_iserr(res)) return res;
+
+    GH_IPCMSG_BUFFER(msg_buf);
+    res = gh_ipc_recv(ipc, (gh_ipcmsg*)msg_buf, GH_IPC_NOTIMEOUT);
+    if (ghr_iserr(res)) return res;
+
+    gh_ipcmsg * msg = (gh_ipcmsg *)msg_buf;
+    if (msg->type != GH_IPCMSG_FUNCTIONRETURN) {
+        printf("type: %d\n", msg->type);
+        return GHR_JAIL_NORETURN;
+    }
+
+    gh_ipcmsg_functionreturn * return_msg = (gh_ipcmsg_functionreturn *)msg;
+    if (return_msg->fd >= 0 && funccall.return_arg.size >= sizeof(int) && funccall.return_arg.addr != (uintptr_t)NULL) {
+        memcpy((void*)funccall.return_arg.addr, &return_msg->fd, sizeof(int));
+    }
+
+    return return_msg->result;
 }

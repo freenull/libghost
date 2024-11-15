@@ -9,10 +9,13 @@
 #include <ghost/alloc.h>
 
 #define GH_IPCMSG_MAXSIZE (1024 * 10)
-#define GH_IPCMSG_BUFFER(name) \
-    char name ## __backing_buf[GH_IPCMSG_MAXSIZE]; \
-    gh_ipcmsg * name = (gh_ipcmsg*)name ## __backing_buf
+#define GH_IPCMSG_BUFFER(name) char name [GH_IPCMSG_MAXSIZE]
+
 #define GH_IPCMSG_CDATAMAXSIZE sizeof(int)
+
+#define GH_IPCMSG_ALIGN __attribute__((aligned(8)))
+
+#define GH_IPC_NOTIMEOUT 0
 
 typedef enum {
     GH_IPCMODE_CONTROLLER,
@@ -25,35 +28,90 @@ typedef struct {
 } gh_ipc;
 
 typedef enum {
+    // jail+subjail recv
     GH_IPCMSG_HELLO,
     GH_IPCMSG_QUIT,
+
+    // jail recv
     GH_IPCMSG_NEWSUBJAIL,
+
+    // subjail recv
+    GH_IPCMSG_TESTCASE,
+    GH_IPCMSG_FUNCTIONRETURN,
+
+    // subjail send
     GH_IPCMSG_SUBJAILALIVE,
+    GH_IPCMSG_FUNCTIONCALL
 } gh_ipcmsg_type;
 
+GH_IPCMSG_ALIGN
 typedef struct {
     gh_ipcmsg_type type;
     char data[];
 } gh_ipcmsg;
 
+GH_IPCMSG_ALIGN
 typedef struct {
     gh_ipcmsg_type type;
     pid_t pid;
 } gh_ipcmsg_hello;
 
+GH_IPCMSG_ALIGN
 typedef struct {
     gh_ipcmsg_type type;
 } gh_ipcmsg_quit;
 
+GH_IPCMSG_ALIGN
 typedef struct {
     gh_ipcmsg_type type;
     int sockfd;
 } gh_ipcmsg_newsubjail;
 
+GH_IPCMSG_ALIGN
 typedef struct {
     gh_ipcmsg_type type;
     int index;
+    pid_t pid;
 } gh_ipcmsg_subjailalive;
+
+GH_IPCMSG_ALIGN
+typedef struct {
+    gh_ipcmsg_type type;
+    int index;
+} gh_ipcmsg_testcase;
+
+typedef struct {
+    uintptr_t addr;
+    size_t size;
+} gh_ipcmsg_functioncall_arg;
+
+#define GH_IPCMSG_FUNCTIONCALL_MAXARGS 16
+#define GH_IPCMSG_FUNCTIONCALL_MAXNAME 256
+
+GH_IPCMSG_ALIGN
+typedef struct {
+    gh_ipcmsg_type type;
+    char name[GH_IPCMSG_FUNCTIONCALL_MAXNAME];
+    gh_ipcmsg_functioncall_arg return_arg;
+    size_t arg_count;
+    gh_ipcmsg_functioncall_arg args[GH_IPCMSG_FUNCTIONCALL_MAXARGS];
+} gh_ipcmsg_functioncall;
+
+#define GH_CONCAT2(A,B) A##B
+#define GH_CONCAT(A,B) GH_CONCAT2(A,B)
+#define GH_STATICASSERT(cond, msg) typedef char GH_CONCAT(gh_static_assert__, __LINE__) [(cond) ? 1 : -1]
+
+GH_STATICASSERT(
+    sizeof(gh_ipcmsg_functioncall) < GH_IPCMSG_MAXSIZE,
+    "Function call message exceeds max IPC message size"
+);
+
+GH_IPCMSG_ALIGN
+typedef struct {
+    gh_ipcmsg_type type;
+    int fd;
+    gh_result result;
+} gh_ipcmsg_functionreturn;
 
 /** @brief Constructs an IPC object.
  *
@@ -113,5 +171,7 @@ gh_result gh_ipc_send(gh_ipc * ipc, gh_ipcmsg * msg, size_t msg_size);
  * @return Result code.
  */
 gh_result gh_ipc_recv(gh_ipc * ipc, gh_ipcmsg * msg, int timeout_ms);
+
+gh_result gh_ipc_call(gh_ipc * ipc, const char * name, size_t argc, gh_ipcmsg_functioncall_arg * args, void * return_arg, size_t return_arg_size);
 
 #endif

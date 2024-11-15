@@ -7,7 +7,7 @@ endfunction()
 function(GhostTest name)
     cmake_parse_arguments(
         GHTEST
-        "MAYLEAK;VALGRINDWORKAROUND"
+        "MAYLEAK;VALGRINDWORKAROUND;NOSANDBOX"
         ""
         ""
         ${ARGN}
@@ -23,14 +23,19 @@ function(GhostTest name)
 
     target_compile_options(test-${__ghost_test_namespace}-${name} PUBLIC -include ${CMAKE_SOURCE_DIR}/tests/test.h)
 
+    set(env "")
+    if (${GHTEST_NOSANDBOX})
+        list(APPEND env "GH_SANDBOX_DISABLED=1")
+    endif()
+
     if (${GHTEST_VALGRINDWORKAROUND})
         target_compile_definitions(test-${__ghost_test_namespace}-${name} PUBLIC GHOST_JAIL_EXE_PATH="$<TARGET_FILE:ghost-jail>")
     endif()
 
     if(${GHTEST_MAYLEAK})
-        add_test(NAME ${__ghost_test_namespace}/${name} COMMAND valgrind --error-exitcode=1 $<TARGET_FILE:test-${__ghost_test_namespace}-${name}>)
+        add_test(NAME ${__ghost_test_namespace}/${name} COMMAND valgrind --trace-children=yes --error-exitcode=1 env ${env} $<TARGET_FILE:test-${__ghost_test_namespace}-${name}>)
     else()
-        add_test(NAME ${__ghost_test_namespace}/${name} COMMAND valgrind --leak-check=full --error-exitcode=1 $<TARGET_FILE:test-${__ghost_test_namespace}-${name}>)
+        add_test(NAME ${__ghost_test_namespace}/${name} COMMAND valgrind --trace-children=yes --leak-check=full --error-exitcode=1 env ${env} $<TARGET_FILE:test-${__ghost_test_namespace}-${name}>)
     endif()
 endfunction()
 

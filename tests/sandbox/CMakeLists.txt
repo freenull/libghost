@@ -1,3 +1,4 @@
 GhostTestNamespace(sandbox)
 
-GhostTest(spawn_and_wait VALGRINDWORKAROUND)
+GhostTest(hello_world VALGRINDWORKAROUND NOSANDBOX)
+GhostTest(threading VALGRINDWORKAROUND NOSANDBOX)

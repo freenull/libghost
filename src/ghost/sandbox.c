@@ -1,9 +1,12 @@
 #define _GNU_SOURCE
 #include <string.h>
+#include <signal.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
 #include <sys/types.h>
+#include <stdlib.h>
 #include <unistd.h>
+#include <ghost/ipc.h>
 #include <ghost/result.h>
 #include <ghost/sandbox.h>
 #include <ghost/embedded_jail.h>
@@ -11,7 +14,12 @@
 static gh_result gh_sandbox_ctor_parent(gh_sandbox * sandbox, gh_sandboxoptions options, pid_t pid) {
     memcpy(&sandbox->options, &options, sizeof(gh_sandboxoptions));
     sandbox->pid = pid;
-    return GHR_OK;
+
+    gh_ipcmsg_hello hello_msg;
+    memset(&hello_msg, 0, sizeof(gh_ipcmsg_hello));
+    hello_msg.type = GH_IPCMSG_HELLO;
+    hello_msg.pid = getpid();
+    return gh_ipc_send(&sandbox->ipc, (gh_ipcmsg*)&hello_msg, sizeof(gh_ipcmsg_hello));
 }
 
 static gh_result gh_sandbox_ctor_child(gh_sandbox * sandbox, gh_sandboxoptions options) {
@@ -106,5 +114,18 @@ gh_result gh_sandbox_dtor(gh_sandbox * sandbox) {
     gh_result res = gh_ipc_dtor(&sandbox->ipc);
     if (ghr_iserr(res)) return res;
 
+    return GHR_OK;
+}
+
+gh_result gh_sandbox_requestquit(gh_sandbox * sandbox) {
+    gh_ipcmsg_quit quit_msg;
+    memset(&quit_msg, 0, sizeof(gh_ipcmsg_quit));
+    quit_msg.type = GH_IPCMSG_QUIT;
+    return gh_ipc_send(&sandbox->ipc, (gh_ipcmsg*)&quit_msg, sizeof(gh_ipcmsg_quit));
+}
+
+gh_result gh_sandbox_forcekill(gh_sandbox * sandbox) {
+    int kill_res = kill(sandbox->pid, SIGKILL);
+    if (kill_res < 0) return ghr_errno(GHR_SANDBOX_KILLFAIL);
     return GHR_OK;
 }

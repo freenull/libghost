@@ -7,11 +7,13 @@
 
 #define GHOST_SANDBOXOPTIONS_NAME_MAX 256
 
-#define GH_SANDBOX_NOMEMLIMIT 0
+#define GH_SANDBOX_NOLIMIT 0
+#define GH_SANDBOX_MAXWAITSUBJAILMS 5000
 
 typedef struct {
     char name[GHOST_SANDBOXOPTIONS_NAME_MAX];
-    size_t memory_limit;
+    size_t memory_limit_bytes;
+    size_t functioncall_frame_limit_bytes;
 
     /* @brief File descriptor of jail IPC socket. Not intended to be set by user, will be reset during sandbox spawn. */
     int jail_ipc_sockfd;
@@ -61,5 +63,8 @@ gh_result gh_sandboxoptions_readfrom(int fd, gh_sandboxoptions * out_options);
  * @return Result code.
  */
 gh_result gh_sandbox_dtor(gh_sandbox * sandbox);
+
+gh_result gh_sandbox_requestquit(gh_sandbox * sandbox);
+gh_result gh_sandbox_forcekill(gh_sandbox * sandbox);
 
 #endif

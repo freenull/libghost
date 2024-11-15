@@ -15,7 +15,7 @@ static gh_result default_allocator(void ** ptr, size_t old_size, size_t new_size
         return GHR_OK;
     }
 
-    if (ptr == NULL) {
+    if (*ptr == NULL) {
         void * new_ptr = malloc(new_size);
         if (new_ptr == NULL) return ghr_errno(GHR_ALLOC_ALLOCFAIL);
 
