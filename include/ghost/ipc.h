@@ -8,6 +8,10 @@
 #include <ghost/result.h>
 #include <ghost/alloc.h>
 
+#define GH_CONCAT2(A,B) A##B
+#define GH_CONCAT(A,B) GH_CONCAT2(A,B)
+#define GH_STATICASSERT(cond, msg) typedef char GH_CONCAT(gh_static_assert__, __LINE__) [(cond) ? 1 : -1]
+
 #define GH_IPCMSG_MAXSIZE (1024 * 10)
 #define GH_IPCMSG_BUFFER(name) char name [GH_IPCMSG_MAXSIZE]
 
@@ -36,11 +40,13 @@ typedef enum {
     GH_IPCMSG_NEWSUBJAIL,
 
     // subjail recv
-    GH_IPCMSG_TESTCASE,
+    GH_IPCMSG_LUASTRING,
     GH_IPCMSG_FUNCTIONRETURN,
 
     // subjail send
     GH_IPCMSG_SUBJAILALIVE,
+    GH_IPCMSG_LUAINFO,
+    GH_IPCMSG_LUARESULT,
     GH_IPCMSG_FUNCTIONCALL
 } gh_ipcmsg_type;
 
@@ -80,6 +86,34 @@ typedef struct {
     int index;
 } gh_ipcmsg_testcase;
 
+#define GH_IPCMSG_LUASTRING_MAXSIZE (GH_IPCMSG_MAXSIZE - sizeof(gh_ipcmsg_type))
+GH_IPCMSG_ALIGN
+typedef struct {
+    gh_ipcmsg_type type;
+    char content[GH_IPCMSG_LUASTRING_MAXSIZE];
+} gh_ipcmsg_luastring;
+
+GH_IPCMSG_ALIGN
+typedef struct {
+    gh_ipcmsg_type type;
+    int script_id;
+} gh_ipcmsg_luainfo;
+
+#define GH_IPCMSG_LUARESULT_ERRORMSGMAX 1024
+
+GH_IPCMSG_ALIGN
+typedef struct {
+    gh_ipcmsg_type type;
+    gh_result result;
+    char error_msg[GH_IPCMSG_LUARESULT_ERRORMSGMAX];
+    int script_id;
+} gh_ipcmsg_luaresult;
+
+GH_STATICASSERT(
+    sizeof(gh_ipcmsg_luaresult) < GH_IPCMSG_MAXSIZE,
+    "Lua result message exceeds max IPC message size"
+);
+
 typedef struct {
     uintptr_t addr;
     size_t size;
@@ -96,10 +130,6 @@ typedef struct {
     size_t arg_count;
     gh_ipcmsg_functioncall_arg args[GH_IPCMSG_FUNCTIONCALL_MAXARGS];
 } gh_ipcmsg_functioncall;
-
-#define GH_CONCAT2(A,B) A##B
-#define GH_CONCAT(A,B) GH_CONCAT2(A,B)
-#define GH_STATICASSERT(cond, msg) typedef char GH_CONCAT(gh_static_assert__, __LINE__) [(cond) ? 1 : -1]
 
 GH_STATICASSERT(
     sizeof(gh_ipcmsg_functioncall) < GH_IPCMSG_MAXSIZE,

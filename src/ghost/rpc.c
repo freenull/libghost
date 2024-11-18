@@ -29,11 +29,12 @@ gh_result gh_rpc_dtor(gh_rpc * rpc) {
 
 gh_result gh_rpc_register(gh_rpc * rpc, const char * name, gh_rpcfunction_func * func) {
     gh_rpcfunction function = {0};
-    strncpy(function.name, name, GH_RPCFUNCTION_MAXNAME);
+    strncpy(function.name, name, GH_RPCFUNCTION_MAXNAME - 1);
     function.name[GH_RPCFUNCTION_MAXNAME - 1] = '\0';
     function.func = func;
 
-    return gh_dynamicarray_append(GH_DYNAMICARRAY(rpc), &rpc_daopts, &function);
+    gh_result r =  gh_dynamicarray_append(GH_DYNAMICARRAY(rpc), &rpc_daopts, &function);
+    return r;
 }
 
 gh_result gh_rpc_newframe(gh_rpc * rpc, const char * name, gh_thread * thread, size_t arg_count, gh_rpcarg * args, gh_rpcarg return_arg, gh_rpcframe * out_frame) {
@@ -70,6 +71,7 @@ gh_result gh_rpc_newframefrommsg(gh_rpc * rpc, gh_thread * thread, gh_ipcmsg_fun
     for (size_t i = 0; i < rpc->size; i++) {
         func = rpc->buffer + i;
         if (strcmp(func->name, msg->name) == 0) break;
+        func = NULL;
     }
 
     if (func == NULL) return GHR_RPC_MISSINGFUNC;
@@ -192,6 +194,19 @@ gh_result gh_rpc_respondtomsg(gh_rpc * rpc, gh_ipcmsg_functioncall * funccall_ms
         if (close_res < 0) return ghr_errno(GHR_RPC_CLOSEFD);
     }
 
+    return GHR_OK;
+}
+
+gh_result gh_rpc_respondmissing(gh_rpc * rpc, gh_ipc * ipc) {
+    (void)rpc;
+
+    gh_ipcmsg_functionreturn ret_msg = {0};
+    ret_msg.type = GH_IPCMSG_FUNCTIONRETURN;
+    ret_msg.result = GHR_RPC_MISSINGFUNC;
+    ret_msg.fd = -1;
+
+    gh_result res = gh_ipc_send(ipc, (gh_ipcmsg*)&ret_msg, sizeof(gh_ipcmsg_functionreturn));
+    if (ghr_iserr(res)) return res;
     return GHR_OK;
 }
 

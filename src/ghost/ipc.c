@@ -120,6 +120,31 @@ gh_result gh_ipc_send(gh_ipc * ipc, gh_ipcmsg * msg, size_t msg_size) {
     return GHR_OK;
 }
 
+static void basic_sanitize_msg(gh_ipcmsg * msg) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+    // RATIONALE: Not all messages have to be sanitized at the receive stage.
+    switch(msg->type) {
+    case GH_IPCMSG_LUASTRING:
+        ((gh_ipcmsg_luastring * )msg)->content[GH_IPCMSG_LUASTRING_MAXSIZE - 1] = '\0';
+        break;
+    case GH_IPCMSG_LUARESULT:
+        ((gh_ipcmsg_luaresult * )msg)->error_msg[GH_IPCMSG_LUARESULT_ERRORMSGMAX - 1] = '\0';
+        break;
+    case GH_IPCMSG_FUNCTIONCALL: {
+        gh_ipcmsg_functioncall * fc_msg = ((gh_ipcmsg_functioncall * )msg);
+        fc_msg->name[GH_IPCMSG_FUNCTIONCALL_MAXNAME - 1] = '\0';
+        if (fc_msg->arg_count > GH_IPCMSG_FUNCTIONCALL_MAXARGS) {
+            fc_msg->arg_count = GH_IPCMSG_FUNCTIONCALL_MAXARGS;
+        }
+        break;
+    }
+
+    default: break;
+#pragma GCC diagnostic pop
+    }
+}
+
 gh_result gh_ipc_recv(gh_ipc * ipc, gh_ipcmsg * msg, int timeout_ms) {
     struct iovec iov;
     struct msghdr msgh;
@@ -163,6 +188,8 @@ gh_result gh_ipc_recv(gh_ipc * ipc, gh_ipcmsg * msg, int timeout_ms) {
 
     if ((unsigned long)recv_size < sizeof(gh_ipcmsg)) return GHR_IPC_RECVTOOSMALL;
 
+    basic_sanitize_msg(msg);
+
     gh_result res = prepare_cmsg(ipc, msg, &msgh, NULL);
     if (ghr_iserr(res)) return res;
 
@@ -195,7 +222,6 @@ gh_result gh_ipc_call(gh_ipc * ipc, const char * name, size_t argc, gh_ipcmsg_fu
 
     gh_ipcmsg * msg = (gh_ipcmsg *)msg_buf;
     if (msg->type != GH_IPCMSG_FUNCTIONRETURN) {
-        printf("type: %d\n", msg->type);
         return GHR_JAIL_NORETURN;
     }
 

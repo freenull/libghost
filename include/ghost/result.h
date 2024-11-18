@@ -91,5 +91,6 @@ const char * ghr_context(gh_result value);
 const char * ghr_error(gh_result value);
 void ghr_fprintf(FILE * file, gh_result value);
 void ghr_fputs(FILE * file, gh_result value);
+void ghr_stringify(char * buf, size_t max_size, gh_result value);
 
 #endif

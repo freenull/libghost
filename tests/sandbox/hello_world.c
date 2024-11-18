@@ -30,8 +30,6 @@ static void func_print(gh_rpc * rpc, gh_rpcframe * frame) {
 int main(void) {
     gh_sandbox sandbox;
 
-    printf("max functioncall args: %zu\n", (size_t)GH_IPCMSG_FUNCTIONCALL_MAXARGS);
-
     gh_sandboxoptions options = {0};
     strcpy(options.name, "ghost-test-sandbox");
     options.memory_limit_bytes = GH_SANDBOX_NOLIMIT;
@@ -45,8 +43,25 @@ int main(void) {
     ghr_assert(gh_sandbox_newthread(&sandbox, &alloc, "thread", &thread));
     gh_rpc_register(gh_thread_rpc(&thread), "print", func_print);
 
-    ghr_assert(gh_thread_runtestcase(&thread, 1));
-    ghr_assert(gh_thread_process(&thread));
+    char s[] =
+        "local ghost = require('ghost')\n"
+        "local res = ghost.call('print', 'string', 'Hello, world!')\n"
+        "print('result:', res)\n"
+        ;
+
+    ghr_assert(gh_thread_runstring(&thread, s, strlen(s), NULL));
+    while (true) {
+        gh_threadnotif notif;
+        ghr_assert(gh_thread_process(&thread, &notif));
+
+        if (notif.type == GH_THREADNOTIF_SCRIPTRESULT) {
+            if (notif.script.result == GHR_LUA_RUNTIME) {
+                fprintf(stderr, "ERROR EXECUTING LUA:\n%s\n", notif.script.error_msg);
+            }
+            ghr_assert(notif.script.result);
+            break;
+        }
+    }
     ghr_assert(gh_thread_requestquit(&thread));
     ghr_assert(gh_thread_dtor(&thread));
 

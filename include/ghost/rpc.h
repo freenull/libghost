@@ -58,6 +58,7 @@ gh_result gh_rpc_newframe(gh_rpc * rpc, const char * name, gh_thread * thread, s
 gh_result gh_rpc_newframefrommsg(gh_rpc * rpc, gh_thread * thread, gh_ipcmsg_functioncall * msg, gh_rpcframe * out_frame);
 gh_result gh_rpc_callframe(gh_rpc * rpc, gh_rpcframe * frame);
 gh_result gh_rpc_respondtomsg(gh_rpc * rpc, gh_ipcmsg_functioncall * funccall_msg, gh_rpcframe * frame);
+gh_result gh_rpc_respondmissing(gh_rpc * rpc, gh_ipc * ipc);
 gh_result gh_rpc_disposeframe(gh_rpc * rpc, gh_rpcframe * frame);
 
 bool gh_rpcframe_argv(gh_rpcframe * frame, size_t index, void ** out_ptr);

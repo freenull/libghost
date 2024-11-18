@@ -43,7 +43,10 @@ static bool message_recv(gh_ipc * ipc, gh_ipcmsg * msg) {
         if (close(sockfd) < 0) ghr_fail(GHR_JAIL_CLOSEFDFAIL);
         break;
 
-    case GH_IPCMSG_TESTCASE: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
+    case GH_IPCMSG_LUASTRING: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
+    case GH_IPCMSG_LUAINFO: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
+    case GH_IPCMSG_LUARESULT: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
+
     case GH_IPCMSG_FUNCTIONCALL: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
     case GH_IPCMSG_FUNCTIONRETURN: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
 
@@ -141,6 +144,9 @@ gh_result gh_jail_lockdown(gh_sandboxoptions * options) {
         /* BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_mmap, 0, 1), */
         /* BPF_STMT(BPF_LD + BPF_W + BPF_ABS, (offsetof(struct seccomp_data, ar))), */
         
+        // loadbuffer crashes the process on error without futex
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_futex, 24, 0),
+
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_recvmsg, 23, 0),
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_sendmsg, 22, 0),
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_close, 21, 0),
@@ -156,7 +162,6 @@ gh_result gh_jail_lockdown(gh_sandboxoptions * options) {
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_munmap, 15, 0),
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_mprotect, 14, 0),
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_mmap, 13, 0),
-        /* BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_futex, 15, 0), */
         /* BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_rt_sigprocmask, 14, 0), */
         /* BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_tgkill, 13, 0), */
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_gettid, 12, 0),

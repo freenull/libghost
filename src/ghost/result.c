@@ -47,3 +47,9 @@ void ghr_fputs(FILE * file, gh_result value) {
     ghr_fprintf(file, value);
     fprintf(file, "\n");
 }
+
+void ghr_stringify(char * buf, size_t max_size, gh_result value) {
+    FILE * f = fmemopen(buf, max_size, "w");
+    ghr_fprintf(f, value);
+    fclose(f);
+}

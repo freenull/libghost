@@ -54,9 +54,17 @@ static void * thread_callback(void * thread_voidp) {
 
     pthread_barrier_wait(&threads_barrier);
 
-    ghr_assert(gh_thread_runtestcase(thread, 2));
-    ghr_assert(gh_thread_process(thread));
-    ghr_assert(gh_thread_process(thread));
+    char s[] =
+        "local ghost = require('ghost')\n"
+        "local ffi = require('ffi')\n"
+        "ffi.cdef [[ typedef int32_t pid_t; pid_t getpid(void); ]]\n"
+        "ghost.call('setbanner', nil, tostring(ffi.C.getpid()) .. ' was here!')\n"
+        "ghost.call('printbanner', nil)\n"
+        ;
+
+    ghr_assert(gh_thread_runstring(thread, s, strlen(s), NULL));
+    ghr_assert(gh_thread_process(thread, NULL));
+    ghr_assert(gh_thread_process(thread, NULL));
     ghr_assert(gh_thread_requestquit(thread));
 
     return NULL;

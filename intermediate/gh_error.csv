@@ -30,6 +30,7 @@ SANDBOX_KILLFAIL,,Failed forcefully killing sandbox
 THREAD_KILLFAIL,,Failed forcefully killing thread
 THREAD_UNKNOWNMESSAGE,,Received unknown message from thread
 THREAD_UNEXPECTEDMESSAGE,,Received unexpected message from thread
+THREAD_LARGESTRING,,Lua script passed as string is too large to send - consider using a memfd
 
 JAIL_OPTIONSMEMFAIL,,Failed creating memory file containing sandbox options
 JAIL_OPTIONSWRITEFAIL,,Failed writing to memory file containing sandbox options
@@ -48,6 +49,13 @@ JAIL_MULTIHELLO,,Received duplicate hello message
 JAIL_CLOSEFDFAIL,,Failed closing IPC socket fd in jail pool process after POOLNEW message
 JAIL_UNSUPPORTEDMSG,,Received message is explicitly not supported by this jail/subjail process
 JAIL_NORETURN,,Expected to receive FUNCTIONRETURN message after FUNCTIONCALL, but got another message
+JAIL_LUAINITFAIL,,Failed initializing Lua environment in subjail
+
+LUA_FAIL,,Unknown error in Lua
+LUA_SYNTAX,,Syntax error during compilation of Lua script
+LUA_MEM,,Lua failed to allocate memory
+LUA_RUNTIME,,Runtime Lua error
+LUA_RECURSIVEERR,,Error while running the Lua error handler function
 
 IPC_SOCKCREATEFAIL,,Failed creating IPC socket
 IPC_MSGNEWFAIL,,Failed allocating memory for message object

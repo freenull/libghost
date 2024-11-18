@@ -1,44 +1,56 @@
 #!/usr/bin/env python3
 
 import argparse
+import os
+import sys
 
 parser = argparse.ArgumentParser()
 parser.add_argument("file")
 parser.add_argument("-n", "--name", required = True)
 parser.add_argument("-e", "--extern", action = "store_true")
 parser.add_argument("-c", "--columns", default = "16")
+parser.add_argument("-o", "--output")
 args = parser.parse_args()
 
-columns = int(args.columns)
+output = sys.stdout
+if args.output is not None:
+    os.makedirs(os.path.dirname(args.output), exist_ok = True)
+    output = open(args.output, "w")
+try:
 
-var_data = args.name
-var_len = f"{var_data}_len"
+    columns = int(args.columns)
 
-print("#include <stddef.h>")
+    var_data = args.name
+    var_len = f"{var_data}_len"
 
-if args.extern:
-    print(f"extern char {var_data}[];")
-    print(f"extern size_t {var_len};")
+    print("#include <stddef.h>", file = output)
 
-print(f"char {var_data}[] = {{")
+    if args.extern:
+        print(f"extern char {var_data}[];", file = output)
+        print(f"extern size_t {var_len};", file = output)
 
-size = 0
-with open(args.file, "rb") as f:
-    col = 0
+    print(f"char {var_data}[] = {{", file = output)
 
-    print("    ", end = "")
-    while b := f.read(1):
-        size += 1
-        if col >= columns:
-            print()
-            print("    ", end = "")
-            col = 0
+    size = 0
+    with open(args.file, "rb") as f:
+        col = 0
 
-        print("0x{:02x}".format(int(b[0])) + ", ", end = "")
+        print("    ", end = "", file = output)
+        while b := f.read(1):
+            size += 1
+            if col >= columns:
+                print(file = output)
+                print("    ", end = "", file = output)
+                col = 0
 
-        col += 1
+            print("0x{:02x}".format(int(b[0])) + ", ", end = "", file = output)
 
-print()
-print(f"}};")
+            col += 1
 
-print(f"size_t {var_len} = {size};")
+    print(file = output)
+    print(f"}};", file = output)
+
+    print(f"size_t {var_len} = {size};", file = output)
+finally:
+    if output != sys.stdout:
+        output.close()

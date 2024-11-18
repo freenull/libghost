@@ -3,6 +3,7 @@ project(ghost VERSION 1.0.0 DESCRIPTION "Safe Lua runtime based on LuaJIT")
 include(GNUInstallDirs)
 include(CTest)
 include(CMakeParseArguments)
+include(ExternalProject)
 
 function(GhostAddCFlags)
     string (REPLACE ";" " " flag_str "${ARGN}")
@@ -45,6 +46,8 @@ GhostAddCFlags(-Wno-error=unused-variable)
 # RATIONALE: Creates issues when the variable is used in an assert(), which is not compiled in at all in release mode.
 GhostAddCFlags(-Wno-error=unused-function)
 # RATIONALE: Creates issues when the function is used in an assert(), which is not compiled in at all in release mode.
+GhostAddCFlags(-Wno-unused-value)
+# RATIONALE: LuaJIT macros like luaL_dostring use operator shortcircuiting to save on writing if conditions sometimes. This triggers unused value warnings.
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ")
 
@@ -101,13 +104,29 @@ GhostCodegenTarget(
 )
 
 file(GLOB ghost_src "src/ghost/*.c")
+list(APPEND ghost_src "src/ghost/generated/gh_error.c")
 file(GLOB ghost_inc "include/ghost/*.h")
 
+set(cembed "${PROJECT_SOURCE_DIR}/tools/cembed.py")
+
+add_custom_command(
+    OUTPUT "${PROJECT_BINARY_DIR}/lua_init.c"
+    COMMAND "${cembed}" "${PROJECT_SOURCE_DIR}/intermediate/init.lua" -e -n gh_luainit_script_data -o "${PROJECT_BINARY_DIR}/lua_init.c"
+    DEPENDS "${PROJECT_SOURCE_DIR}/intermediate/init.lua" ${cembed}
+)
+add_custom_target(ghost-jail-luainit DEPENDS "${PROJECT_BINARY_DIR}/lua_init.c")
+
+set(luajit_include "${CMAKE_BINARY_DIR}/luajit/usr/local/include" )
+add_library(libluajit SHARED IMPORTED)
+add_dependencies(libluajit luajit)
+set_target_properties(libluajit PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/libs/luajit/src/libluajit.so")
+
 list(APPEND ghost_src ${enum_error_out_source})
+list(APPEND ghost_src "${PROJECT_BINARY_DIR}/lua_init.c")
 list(APPEND ghost_inc ${enum_error_out_header})
 
 add_library(libghost-nojail SHARED "${ghost_src}")
-add_dependencies(libghost-nojail ghost-enum-error ghost-enum-msgtype)
+add_dependencies(libghost-nojail ghost-enum-error ghost-enum-msgtype ghost-jail-luainit)
 set_target_properties(libghost-nojail PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(libghost-nojail PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 set_target_properties(libghost-nojail PROPERTIES OUTPUT_NAME "ghost")
@@ -121,18 +140,28 @@ target_sources(
     FILES ${ghost_inc}
 )
 
+ExternalProject_Add(luajit
+    SOURCE_DIR ${CMAKE_SOURCE_DIR}/libs/luajit
+    INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/luajit
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND ${CMAKE_COMMAND} -E env
+        CC=${CMAKE_C_COMPILER}
+        make -C <SOURCE_DIR>
+    BUILD_IN_SOURCE TRUE
+    INSTALL_COMMAND make DESTDIR=<INSTALL_DIR> install
+)
+
 file(GLOB_RECURSE jail_src "src/jail/*.c")
 file(GLOB_RECURSE jail_inc "include/jail/*.h")
 
 add_executable(ghost-jail "${jail_src}")
-target_include_directories(ghost-jail PRIVATE include)
-target_link_libraries(ghost-jail PUBLIC libghost-nojail)
-
-set(cembed "${PROJECT_SOURCE_DIR}/tools/cembed.py")
+add_dependencies(ghost-jail luajit)
+target_link_libraries(ghost-jail PUBLIC libghost-nojail libluajit)
+target_include_directories(ghost-jail PRIVATE ${luajit_include})
 
 add_custom_command(
     OUTPUT "${PROJECT_BINARY_DIR}/embedded_jail.c"
-    COMMAND "${cembed}" "${PROJECT_BINARY_DIR}/ghost-jail" -e -n gh_embeddedjail_exe_data > "${PROJECT_BINARY_DIR}/embedded_jail.c"
+    COMMAND "${cembed}" "${PROJECT_BINARY_DIR}/ghost-jail" -e -n gh_embeddedjail_exe_data -o "${PROJECT_BINARY_DIR}/embedded_jail.c"
     DEPENDS ${jail_src} ${jail_inc} ${cembed}
 )
 add_custom_target(ghost-embedded-jail DEPENDS "${PROJECT_BINARY_DIR}/embedded_jail.c" ghost-jail)
@@ -152,7 +181,7 @@ add_library(
     ${ghost_src} ${ghost_embedded_jail_src}
 )
 
-add_dependencies(libghost ghost-embedded-jail ghost-jail)
+add_dependencies(libghost ghost-embedded-jail ghost-jail ghost-jail-luainit)
 set_target_properties(libghost PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(libghost PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 set_target_properties(libghost PROPERTIES OUTPUT_NAME "ghost")
