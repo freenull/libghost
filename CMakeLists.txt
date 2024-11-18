@@ -48,6 +48,8 @@ GhostAddCFlags(-Wno-error=unused-function)
 # RATIONALE: Creates issues when the function is used in an assert(), which is not compiled in at all in release mode.
 GhostAddCFlags(-Wno-unused-value)
 # RATIONALE: LuaJIT macros like luaL_dostring use operator shortcircuiting to save on writing if conditions sometimes. This triggers unused value warnings.
+GhostAddCFlags(-Wno-unknown-pragmas)
+# RATIONALE: Sometimes #pragma clang is used instead of #pragma GCC to only affect Clang.
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ")
 

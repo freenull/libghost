@@ -6,11 +6,11 @@
 #include <ghost/ipc.h>
 #include <luajit-2.1/lua.h>
 #include <luajit-2.1/lauxlib.h>
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wreserved-macro-identifier"
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreserved-macro-identifier"
 // RATIONALE: LuaJIT does this and we don't control LuaJIT source.
 #include <luajit-2.1/lualib.h>
-#pragma GCC diagnostic pop
+#pragma clang diagnostic pop
 
 extern char gh_luainit_script_data[];
 extern size_t gh_luainit_script_data_len;
