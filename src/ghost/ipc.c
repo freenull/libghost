@@ -48,6 +48,9 @@ static gh_result prepare_cmsg(gh_ipc * ipc, gh_ipcmsg * msg, struct msghdr * msg
     } else if (msg->type == GH_IPCMSG_FUNCTIONRETURN) {
         fd = &((gh_ipcmsg_functionreturn *)msg)->fd;
         required = false;
+    } else if (msg->type == GH_IPCMSG_LUAFILE) {
+        fd = &((gh_ipcmsg_luafile *)msg)->fd;
+        required = true;
     }
 
     if (fd != NULL && (!is_send || *fd >= 0)) {

@@ -26,7 +26,7 @@ typedef struct {
     size_t * size;
 } gh_dynamicarray;
 
-typedef gh_result gh_dynamicarray_dtorelement_func(void * elem, void * userdata);
+typedef gh_result gh_dynamicarray_dtorelement_func(gh_dynamicarray da, void * elem, void * userdata);
 
 typedef struct {
     size_t initial_capacity;
@@ -44,5 +44,6 @@ gh_result gh_dynamicarray_expandtofit(gh_dynamicarray da, const gh_dynamicarrayo
 gh_result gh_dynamicarray_append(gh_dynamicarray da, const gh_dynamicarrayoptions * options, void * ptr);
 gh_result gh_dynamicarray_appendmany(gh_dynamicarray da, const gh_dynamicarrayoptions * options, void * ptr, size_t count);
 gh_result gh_dynamicarray_removeat(gh_dynamicarray da, const gh_dynamicarrayoptions * options, size_t index);
+gh_result gh_dynamicarray_getat(gh_dynamicarray da, const gh_dynamicarrayoptions * options, size_t index, void ** out_ptr);
 
 #endif

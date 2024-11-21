@@ -3,7 +3,8 @@
 #include <ghost/alloc.h>
 #include <ghost/dynamic_array.h>
 
-static gh_result free_str(void * obj, void * userdata) {
+static gh_result free_str(gh_dynamicarray da, void * obj, void * userdata) {
+    (void)da;
     (void)userdata;
 
     char ** str = (char**)obj;

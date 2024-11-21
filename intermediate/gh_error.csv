@@ -11,6 +11,13 @@ ALLOC_INVALIDSIZE,,Invalid size passed to allocator function
 DYNAMICARRAY_MAXCAPACITY,,Maximum capacity of dynamic array reached
 DYNAMICARRAY_OUTOFBOUNDS,,Dynamic array index out of bounds
 
+FLEXIBLELIST_INVALIDSIZETYPE,,Invalid size field type in flexible list options
+FLEXIBLELIST_NONEXT,,Reached end of flexible list
+FLEXIBLELIST_MAXCAPACITY,,Maximum capacity of flexible list reached
+FLEXIBLELIST_NODELETEFLAG,,Removing entries is only supported if the flexible list's element type has a delete flag and the flexible list options has_delete_flag and delete_flag_field_offset are provided
+FLEXIBLELIST_ALREADYDELETED,,Element of flexible list was already deleted
+FLEXIBLELIST_APPENDDELETED,,Attempted to append an entry with a set delete flag to a flexible list
+
 EMBEDDEDJAIL_CREATEFAIL,,Failed creating memory file for embedded jail executable
 EMBEDDEDJAIL_WRITEFAIL,,Failed writing embedded jail executable to memory file - write failed
 EMBEDDEDJAIL_WRITETRUNC,,Failed writing embedded jail executable to memory file - written data was truncated
@@ -27,10 +34,12 @@ SANDBOX_EXPECTEDSUBJAILALIVE,,Expected to receive SUBJAILALIVE message, but subj
 SANDBOX_THREADRECOVERYKILLFAIL,,Failed killing subjail process as part of recovery process from another error
 SANDBOX_KILLFAIL,,Failed forcefully killing sandbox
 
+THREAD_LONGSAFEID,,Safe ID is too long and as opposed to the name, the safe ID may not be truncated
 THREAD_KILLFAIL,,Failed forcefully killing thread
 THREAD_UNKNOWNMESSAGE,,Received unknown message from thread
 THREAD_UNEXPECTEDMESSAGE,,Received unexpected message from thread
 THREAD_LARGESTRING,,Lua script passed as string is too large to send - consider using a memfd
+THREAD_LUAFAIL,,Lua script failed with an error according to subjail process
 
 JAIL_OPTIONSMEMFAIL,,Failed creating memory file containing sandbox options
 JAIL_OPTIONSWRITEFAIL,,Failed writing to memory file containing sandbox options
@@ -47,6 +56,7 @@ JAIL_KILLEDSIG,,Jail process was killed with signal
 JAIL_UNKNOWNMESSAGE,,Received unknown message
 JAIL_MULTIHELLO,,Received duplicate hello message
 JAIL_CLOSEFDFAIL,,Failed closing IPC socket fd in jail pool process after POOLNEW message
+JAIL_KILLFAIL,,Failed killing subjail
 JAIL_UNSUPPORTEDMSG,,Received message is explicitly not supported by this jail/subjail process
 JAIL_NORETURN,,Expected to receive FUNCTIONRETURN message after FUNCTIONCALL, but got another message
 JAIL_LUAINITFAIL,,Failed initializing Lua environment in subjail
@@ -117,5 +127,33 @@ RPCF_ARG15,,Invalid argument #15
 RPCF_ARG16,,Invalid argument #16
 
 TEST_GENERIC,,Generic error from test case
+
+PROCFD_INVALIDFD,,Invalid file descriptor passed
+PROCFD_BIGFDPATH,,File descriptor too large to retrieve path
+PROCFD_PROCPATHFDOPEN,,Failed opening /proc/self/fd
+PROCFD_PROCPATHFDCLOSE,,Failed closing /proc/self/fd file descriptor
+PROCFD_FDPATHCONSTRUCT,,Failed constructing /proc/self/fd/XXXX path to retrieve real path of file descriptor
+PROCFD_READLINK,,Failed reading /proc/self/fd/XXXX link contents
+PROCFD_LARGELINK,,/proc/self/fd/XXXX link is too large to read
+PROCFD_REOPENFAIL,,Failed safely reopening file through procfs
+
+PERMFS_STATFAIL,,fstat(2) on file descriptor failed
+PERMFS_BADTYPE,,File type cannot be acted upon by permfs (not a regular file, directory or symlink)
+PERMFS_BADFCNTLMODE,,Provided open(2)-like mode is not supported
+PERMFS_FAILOPEN,,Failed opening file
+PERMFS_PATHFDOPENFAIL,,Failed opening path fd
+PERMFS_PATHFDCLOSEFAIL,,Failed closing path fd
+
+PERMS_REJECTEDPOLICY,,Permission to resource denied by existing security policy
+PERMS_REJECTEDUSER,,Permission to resource denied by user
+PERMS_REJECTEDPROMPT,,"Permission to resource denied, user should be prompted to change security policy"
+PERMS_REJECTEDKILL,,Permission to resource denied and source must be terminated immediately
+
+PERMPROMPT_UNSUPPORTEDGROUP,,Prompter does not support this permission group
+PERMPROMPT_UNSUPPORTEDRESOURCE,,Prompter does not support this permission resource
+PERMPROMPT_MISSINGFIELD,,Required field was missing from prompter request
+PERMPROMPT_REJECTED,,Permission request was rejected by prompter
+PERMPROMPT_REJECTEDUSER,,User rejected permission request
+PERMPROMPT_REJECTEDUNKNOWN,,Permission request was rejected for unknown reason
 
 UNKNOWN,,Unknown error

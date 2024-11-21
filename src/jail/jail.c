@@ -1,12 +1,15 @@
+#define _GNU_SOURCE
 #include <inttypes.h>
 #include <errno.h>
 #include <stdio.h>
+#include <signal.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <linux/bpf_common.h>
 #include <linux/seccomp.h>
 #include <linux/filter.h>
 #include <linux/audit.h>
+#include <sys/wait.h>
 #include <sys/ptrace.h>
 #include <sys/prctl.h>
 #include <sys/socket.h>
@@ -43,7 +46,25 @@ static bool message_recv(gh_ipc * ipc, gh_ipcmsg * msg) {
         if (close(sockfd) < 0) ghr_fail(GHR_JAIL_CLOSEFDFAIL);
         break;
 
+    case GH_IPCMSG_KILLSUBJAIL: {
+        gh_ipcmsg_killsubjail * killmsg = (gh_ipcmsg_killsubjail * )msg;
+        if (kill(killmsg->pid, SIGKILL) < 0) {
+            ghr_fail(GHR_JAIL_KILLFAIL);
+        }
+        (void)waitpid(killmsg->pid, NULL, 0);
+
+        ghr_assert(gh_ipc_send(ipc, (gh_ipcmsg *)&(gh_ipcmsg_subjaildead){
+            .type = GH_IPCMSG_SUBJAILDEAD,
+            .pid = killmsg->pid
+        }, sizeof(gh_ipcmsg_subjaildead)));
+
+        break;
+    }
+
+    case GH_IPCMSG_SUBJAILDEAD: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
+
     case GH_IPCMSG_LUASTRING: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
+    case GH_IPCMSG_LUAFILE: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
     case GH_IPCMSG_LUAINFO: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
     case GH_IPCMSG_LUARESULT: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
 
@@ -144,6 +165,21 @@ gh_result gh_jail_lockdown(gh_sandboxoptions * options) {
         /* BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_mmap, 0, 1), */
         /* BPF_STMT(BPF_LD + BPF_W + BPF_ABS, (offsetof(struct seccomp_data, ar))), */
         
+
+        // fcntl is used by fdopen (which we want), but glibc fdopen calls
+        // fnctl to verify that the fd is readable/writable per the mode
+        // so we let fcntl through only if the second argument is F_GETFL
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_fcntl, 0, 4),
+        BPF_STMT(BPF_LD + BPF_W + BPF_ABS, (offsetof(struct seccomp_data, args[1]))),
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, F_GETFL, 0, 1),
+        BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW),
+        BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_KILL_PROCESS),
+
+        // allow installing additional seccomp filters
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_seccomp, 27, 0),
+
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_wait4, 26, 0),
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_kill, 25, 0),
         // loadbuffer crashes the process on error without futex
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_futex, 24, 0),
 
@@ -209,7 +245,7 @@ gh_result gh_jail_lockdown(gh_sandboxoptions * options) {
         }
     }
 
-    if (prctl(PR_SET_SECCOMP, 2, &prog) != 0)
+    if (syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, 0, &prog) != 0)
     {
         return ghr_errno(GHR_JAIL_SECCOMPFAIL);
     }

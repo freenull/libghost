@@ -61,8 +61,8 @@ gh_result gh_rpc_respondtomsg(gh_rpc * rpc, gh_ipcmsg_functioncall * funccall_ms
 gh_result gh_rpc_respondmissing(gh_rpc * rpc, gh_ipc * ipc);
 gh_result gh_rpc_disposeframe(gh_rpc * rpc, gh_rpcframe * frame);
 
-bool gh_rpcframe_argv(gh_rpcframe * frame, size_t index, void ** out_ptr);
-#define gh_rpcframe_arg(frame, index, out_ptr) gh_rpcframe_argv((frame), (index), (void**)(out_ptr))
+bool gh_rpcframe_argv(gh_rpcframe * frame, size_t index, size_t size, void ** out_ptr);
+#define gh_rpcframe_arg(frame, index, out_ptr) gh_rpcframe_argv((frame), (index), sizeof(**(out_ptr)), (void**)(out_ptr))
 bool gh_rpcframe_argbufv(gh_rpcframe * frame, size_t index, void ** out_ptr, size_t * out_size);
 #define gh_rpcframe_argbuf(frame, index, out_ptr, out_size) gh_rpcframe_argbufv((frame), (index), (void**)(out_ptr), (out_size))
 bool gh_rpcframe_setreturnv(gh_rpcframe * frame, void * ptr, size_t size);

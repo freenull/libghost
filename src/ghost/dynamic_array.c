@@ -20,6 +20,7 @@ gh_result gh_dynamicarray_dtorelements(gh_dynamicarray da, const gh_dynamicarray
     if (options->dtorelement_func == NULL) return GHR_OK;
     for (size_t i = 0; i < *da.size; i++) {
         gh_result res = options->dtorelement_func(
+            da,
             (void*)(((char*)*da.buffer) + (i * options->element_size)),
             options->userdata
         );
@@ -85,7 +86,7 @@ gh_result gh_dynamicarray_removeat(gh_dynamicarray da, const gh_dynamicarrayopti
 
     void * entry = ((char*)*da.buffer + options->element_size * index);
     if (options->dtorelement_func != NULL) {
-        gh_result res = options->dtorelement_func(entry, options->userdata);
+        gh_result res = options->dtorelement_func(da, entry, options->userdata);
         if (ghr_iserr(res)) return res;
     }
 
@@ -97,6 +98,15 @@ gh_result gh_dynamicarray_removeat(gh_dynamicarray da, const gh_dynamicarrayopti
     }
 
     *da.size -= 1;
+
+    return GHR_OK;
+}
+
+gh_result gh_dynamicarray_getat(gh_dynamicarray da, const gh_dynamicarrayoptions * options, size_t index, void ** out_ptr) {
+    if (index >= *da.size) return GHR_DYNAMICARRAY_OUTOFBOUNDS;
+
+    void * entry = ((char*)*da.buffer + options->element_size * index);
+    if (out_ptr != NULL) *out_ptr = entry;
 
     return GHR_OK;
 }

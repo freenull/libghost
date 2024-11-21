@@ -1,12 +1,14 @@
 #define _GNU_SOURCE
 #include <signal.h>
 #include <string.h>
+#include <sys/wait.h>
 #include <ghost/result.h>
+#include <ghost/sandbox.h>
 #include <ghost/thread.h>
 #include <ghost/rpc.h>
 #include <ghost/ipc.h>
 
-gh_result gh_sandbox_newthread(gh_sandbox * sandbox, gh_alloc * alloc, const char * name, gh_thread * out_thread) {
+gh_result gh_sandbox_newthread(gh_sandbox * sandbox, gh_alloc * alloc, const char * name, const char * safe_id, gh_thread * out_thread) {
     gh_ipc direct_ipc;
     int direct_peerfd;
 
@@ -54,6 +56,13 @@ gh_result gh_sandbox_newthread(gh_sandbox * sandbox, gh_alloc * alloc, const cha
     out_thread->name[GH_THREAD_MAXNAME - 1] = '\0';
     out_thread->sandbox = sandbox;
 
+    size_t safe_id_len = strlen(safe_id);
+    if (safe_id_len > GH_THREAD_MAXSAFEID - 1) return GHR_THREAD_LONGSAFEID;
+    strncpy(out_thread->safe_id, safe_id, GH_THREAD_MAXSAFEID);
+    out_thread->safe_id[GH_THREAD_MAXSAFEID - 1] = '\0';
+
+    out_thread->userdata = NULL;
+
     res = gh_rpc_ctor(&out_thread->rpc, alloc);
     if (ghr_iserr(res)) goto fail_rpc_ctor;
 
@@ -79,6 +88,11 @@ gh_result gh_thread_dtor(gh_thread * thread) {
     res = gh_ipc_dtor(&thread->ipc);
     if (ghr_iserr(res)) return res;
     
+    return GHR_OK;
+}
+
+gh_result gh_thread_attachuserdata(gh_thread * thread, void * userdata) {
+    thread->userdata = userdata;
     return GHR_OK;
 }
 
@@ -113,7 +127,10 @@ static gh_result thread_handlemsg(gh_thread * thread, gh_ipcmsg * msg, gh_thread
     case GH_IPCMSG_FUNCTIONCALL:
         if (notif != NULL) notif->type = GH_THREADNOTIF_FUNCTIONCALLED;
         gh_ipcmsg_functioncall * call_msg = (gh_ipcmsg_functioncall *)msg;
-        if (notif != NULL) notif->function.name = call_msg->name;
+        if (notif != NULL) {
+            strncpy(notif->function.name, call_msg->name, GH_IPCMSG_FUNCTIONCALL_MAXNAME);
+            notif->function.name[GH_IPCMSG_FUNCTIONCALL_MAXNAME - 1] = '\0';
+        }
         gh_result res = thread_handlemsg_functioncall(thread, call_msg);
         if (ghr_is(res, GHR_RPC_MISSINGFUNC)) {
             notif->function.missing = true;
@@ -128,7 +145,8 @@ static gh_result thread_handlemsg(gh_thread * thread, gh_ipcmsg * msg, gh_thread
             gh_ipcmsg_luaresult * result_msg = (gh_ipcmsg_luaresult *)msg;
             notif->script.result = result_msg->result;
             notif->script.id = result_msg->script_id;
-            notif->script.error_msg = result_msg->error_msg;
+            strncpy(notif->script.error_msg, result_msg->error_msg, GH_THREADNOTIF_SCRIPT_ERRORMSGMAX);
+            notif->script.error_msg[GH_THREADNOTIF_SCRIPT_ERRORMSGMAX - 1] = '\0';
         }
         return GHR_OK;
 
@@ -160,8 +178,16 @@ gh_result gh_thread_requestquit(gh_thread * thread) {
 }
 
 gh_result gh_thread_forcekill(gh_thread * thread) {
-    int kill_res = kill(thread->pid, SIGKILL);
-    if (kill_res < 0) return ghr_errno(GHR_SANDBOX_KILLFAIL);
+    gh_result res = gh_ipc_send(&thread->sandbox->ipc, (gh_ipcmsg * )&(gh_ipcmsg_killsubjail){
+        .type = GH_IPCMSG_KILLSUBJAIL,
+        .pid = thread->pid
+    }, sizeof(gh_ipcmsg_killsubjail));
+    if (ghr_iserr(res)) return res;
+
+    GH_IPCMSG_BUFFER(msg_buf);
+    res = gh_ipc_recv(&thread->sandbox->ipc, (gh_ipcmsg *)msg_buf, GH_IPC_NOTIMEOUT);
+    if (ghr_iserr(res)) return res;
+
     return GHR_OK;
 }
 
@@ -188,4 +214,64 @@ gh_result gh_thread_runstring(gh_thread * thread, const char * s, size_t s_len, 
 
     if (script_id != NULL) *script_id = ((gh_ipcmsg_luainfo *)response_msgbuf)->script_id;
     return GHR_OK;
+}
+
+static gh_result thread_syncscript(gh_thread * thread, int script_id, gh_threadnotif_script * out_status) {
+    gh_result res = GHR_OK;
+
+    while (true) {
+        gh_threadnotif notif = {0};
+        res = gh_thread_process(thread, &notif);
+        if (ghr_iserr(res)) return res;
+
+        if (notif.type == GH_THREADNOTIF_SCRIPTRESULT && notif.script.id == script_id) {
+            if (ghr_iserr(notif.script.result)) {
+                fprintf(stderr, "LUA ERROR: ");
+                ghr_fputs(stderr, notif.script.result);
+                if (ghr_is(notif.script.result, GHR_LUA_RUNTIME)) {
+                    fprintf(stderr, "LUA ERROR DETAILS: \n");
+                    fprintf(stderr, "%s\n", notif.script.error_msg);
+                }
+                if (out_status != NULL) *out_status = notif.script;
+                res = GHR_THREAD_LUAFAIL;
+            }
+            break;
+        }
+    }
+
+    return res;
+}
+
+gh_result gh_thread_runstringsync(gh_thread * thread, const char * s, size_t s_len, gh_threadnotif_script * out_status) {
+    int script_id = -1;
+    gh_result res = gh_thread_runstring(thread, s, s_len, &script_id);
+    if (ghr_iserr(res)) return res;
+
+    return thread_syncscript(thread, script_id, out_status);
+}
+
+gh_result gh_thread_runfile(gh_thread * thread, int fd, int * script_id) {
+    gh_ipcmsg_luafile msg = {0};
+    msg.type = GH_IPCMSG_LUAFILE;
+    msg.fd = fd;
+    strncpy(msg.chunk_name, thread->safe_id, GH_IPCMSG_LUAFILE_CHUNKNAMEMAX);
+    msg.chunk_name[GH_IPCMSG_LUAFILE_CHUNKNAMEMAX - 1] = '\0';
+
+    gh_result res = gh_ipc_send(&thread->ipc, (gh_ipcmsg*)&msg, sizeof(gh_ipcmsg_luafile));
+    if (ghr_iserr(res)) return res;
+
+    GH_IPCMSG_BUFFER(response_msgbuf);
+    res = gh_ipc_recv(&thread->ipc, (gh_ipcmsg *)response_msgbuf, GH_THREAD_LUAINFO_TIMEOUTMS);
+    if (ghr_iserr(res)) return res;
+
+    if (script_id != NULL) *script_id = ((gh_ipcmsg_luainfo *)response_msgbuf)->script_id;
+    return GHR_OK;
+}
+
+gh_result gh_thread_runfilesync(gh_thread * thread, int fd, gh_threadnotif_script * out_status) {
+    int script_id = -1;
+    gh_result res = gh_thread_runfile(thread, fd, &script_id);
+    if (ghr_iserr(res)) return res;
+
+    return thread_syncscript(thread, script_id, out_status);
 }

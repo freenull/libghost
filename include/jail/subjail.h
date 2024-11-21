@@ -10,5 +10,6 @@ extern lua_State * L;
 
 void gh_subjail_spawn(int sockfd, int parent_pid, gh_ipc * parent_ipc);
 int gh_subjail_main(gh_ipc * ipc, int parent_pid, gh_ipc * parent_ipc);
+gh_result gh_subjail_lockdown(void);
 
 #endif

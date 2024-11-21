@@ -1,0 +1,17 @@
+local ghost = require('ghost')
+
+print(pcall(function()
+    local fd = ghost.call('open', 'int', tmp_path, 0)
+    print('fd: ' .. tostring(fd))
+    local file = ghost.fdopen(fd, 'r')
+    print('file: ' .. tostring(file))
+    print('content: ' .. file:read('*a'))
+    file:close()
+end))
+
+local fd2 = ghost.call('open', 'int', tmp_path, 0)
+print('fd2: ' .. tostring(fd2))
+file = ghost.fdopen(fd2, 'r')
+print('file: ' .. tostring(file))
+print('content: ' .. file:read('*a'))
+file:close()

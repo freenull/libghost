@@ -15,7 +15,7 @@ bool gh_embeddedjail_available(void) {
 
 gh_result gh_embeddedjail_createfd(int * out_fd) {
     if (!gh_embeddedjail_available()) return GHR_EMBEDDEDJAIL_UNAVAILABLE;
-    int fd = memfd_create("gh-embeddedjail", MFD_CLOEXEC);
+    int fd = memfd_create("gh-embeddedjail", 0);
     if (fd < 0) return ghr_errno(GHR_EMBEDDEDJAIL_CREATEFAIL);
 
     ssize_t write_res = write(fd, gh_embeddedjail_exe_data, gh_embeddedjail_exe_data_len);
@@ -51,7 +51,6 @@ gh_result gh_embeddedjail_exec(const char * name, int options_fd) {
 #pragma GCC diagnostic ignored "-Wcast-qual"
     // RATIONALE: The cast is okay, exec replaces the entire address space anyway.
 
-    /* int exec_res = execve("/home/db/Projects/C/ghost/build/ghost-jail", (char * const *)argv, (char * const * const)environ); */
     int exec_res = fexecve(fd, (char * const *)argv, (char * const * const)environ);
 #pragma GCC diagnostic pop
     if (exec_res < 0) return ghr_errno(GHR_EMBEDDEDJAIL_EXECFAIL);

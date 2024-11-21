@@ -40,7 +40,7 @@ int main(void) {
     ghr_assert(gh_sandbox_ctor(&sandbox, options));
 
     gh_thread thread;
-    ghr_assert(gh_sandbox_newthread(&sandbox, &alloc, "thread", &thread));
+    ghr_assert(gh_sandbox_newthread(&sandbox, &alloc, "thread", "thread", &thread));
     gh_rpc_register(gh_thread_rpc(&thread), "print", func_print);
 
     char s[] =

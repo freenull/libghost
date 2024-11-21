@@ -89,7 +89,7 @@ int main(void) {
         snprintf(name, strlen("thread") + 2, "thread%d", (int)i);
         name[strlen("thread") + 1] = '\0';
 
-        ghr_assert(gh_sandbox_newthread(&sandbox, &alloc, name, threads + i));
+        ghr_assert(gh_sandbox_newthread(&sandbox, &alloc, name, name, threads + i));
         assert(pthread_create(pthreads + i, NULL, thread_callback, threads + i) == 0);
     }
 

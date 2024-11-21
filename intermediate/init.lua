@@ -1,8 +1,11 @@
 local ffi = require('ffi')
 
--- gh_ipc pointer is passed as void* through the global IPC by the subjail
-local IPC = IPC
-_G.IPC = nil
+-- objects that have to be passed in through the C API (like the IPC pointer or
+-- magic fdopen function) are passed through the global table 'c_support'
+local c_support = c_support
+_G.c_support = nil
+
+local IPC = c_support.ipc
 
 local ghost = {}
 package.loaded.ghost = ghost
@@ -27,6 +30,7 @@ ffi.cdef[[
     );
 
     char * strcpy(char * restrict dst, const char * restrict src);
+    struct FILE * fdopen(int fd, const char * mode);
 ]]
 
 local function retbuffer_ctype(t, size)
@@ -136,15 +140,6 @@ function ghost.call(name, ret_type, ...)
         end
     end
 
-    -- for i = 1, arg_count do
-    --     args[i].addr = ffi.cast('uintptr_t', arg["arg" .. tostring(i)])
-    --     args[i].size = #str
-    -- end
-
-    for i, v in ipairs(gc_protect) do
-        print(i, v)
-    end
-
     local result = ffi.C.gh_ipc_call(IPC, name, arg_count, args, ret_obj, ret_size)
     handle_ghr(result)
 
@@ -155,5 +150,11 @@ function ghost.call(name, ret_type, ...)
     return nil
 end
 
--- call("print", "int", "Hello, world!")
--- call("foo", "int", "u", 1234, 419, "a")
+local io = require("io")
+local debug = require("debug")
+local io_meta = debug.getmetatable(io.stdout)
+function ghost.fdopen(fd, mode)
+    local ud = c_support.fdopen(fd, mode);
+    debug.setmetatable(ud, io_meta)
+    return ud
+end

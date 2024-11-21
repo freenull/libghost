@@ -7,16 +7,17 @@ endfunction()
 function(GhostTest name)
     cmake_parse_arguments(
         GHTEST
-        "MAYLEAK;VALGRINDWORKAROUND;NOSANDBOX"
-        ""
+        "MAYLEAK;NOSANDBOX"
+        "TIMEOUT;STDIN"
         ""
         ${ARGN}
     )
 
-    set(src ${name}.c)
-    if (${GHTEST_VALGRINDWORKAROUND})
-        list(APPEND src ${CMAKE_SOURCE_DIR}/tests/valgrind_fexecve.c)
+    if (NOT DEFINED GHTEST_TIMEOUT)
+        set(GHTEST_TIMEOUT 0)
     endif()
+
+    set(src ${name}.c)
 
     add_executable(test-${__ghost_test_namespace}-${name} ${src})
     target_link_libraries(test-${__ghost_test_namespace}-${name} libghost)
@@ -28,15 +29,16 @@ function(GhostTest name)
         list(APPEND env "GH_SANDBOX_DISABLED=1")
     endif()
 
-    if (${GHTEST_VALGRINDWORKAROUND})
-        target_compile_definitions(test-${__ghost_test_namespace}-${name} PUBLIC GHOST_JAIL_EXE_PATH="$<TARGET_FILE:ghost-jail>")
+    set(test_workdir "${CMAKE_SOURCE_DIR}/tests/${__ghost_test_namespace}")
+
+    set(extra_valgrind_opts "")
+    if(NOT GHTEST_MAYLEAK)
+        list(APPEND extra_valgrind_opts --leak-check=full --show-leak-kinds=all)
     endif()
 
-    if(${GHTEST_MAYLEAK})
-        add_test(NAME ${__ghost_test_namespace}/${name} COMMAND valgrind --trace-children=yes --error-exitcode=1 env ${env} $<TARGET_FILE:test-${__ghost_test_namespace}-${name}>)
-    else()
-        add_test(NAME ${__ghost_test_namespace}/${name} COMMAND valgrind --trace-children=yes --leak-check=full --error-exitcode=1 env ${env} $<TARGET_FILE:test-${__ghost_test_namespace}-${name}>)
-    endif()
+    add_test(NAME ${__ghost_test_namespace}/${name} COMMAND valgrind --trace-children=yes ${extra_valgrind_opts} --error-exitcode=1 env ${env} $<TARGET_FILE:test-${__ghost_test_namespace}-${name}> WORKING_DIRECTORY ${test_workdir})
+
+    set_tests_properties(${__ghost_test_namespace}/${name} PROPERTIES TIMEOUT ${GHTEST_TIMEOUT})
 endfunction()
 
 file(GLOB tests_files LIST_DIRECTORIES true "*")

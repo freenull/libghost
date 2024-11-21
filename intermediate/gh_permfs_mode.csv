@@ -1,0 +1,7 @@
+EnumKey,Value,Description
+NONE,0,None
+CREATEFILE,::,Create file node at path
+CREATEDIR,::,Create directory node at path
+READ,::,Open file at path as readable
+WRITE,::,Open file at path as writable
+UNLINK,::,Unlink node at path

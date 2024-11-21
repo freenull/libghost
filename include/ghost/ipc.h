@@ -19,6 +19,7 @@
 
 #define GH_IPCMSG_ALIGN __attribute__((aligned(8)))
 
+#define GH_IPC_HUPTIMEOUTMS 1000
 #define GH_IPC_NOTIMEOUT 0
 
 typedef enum {
@@ -38,9 +39,14 @@ typedef enum {
 
     // jail recv
     GH_IPCMSG_NEWSUBJAIL,
+    GH_IPCMSG_KILLSUBJAIL,
+
+    // jail send
+    GH_IPCMSG_SUBJAILDEAD,
 
     // subjail recv
     GH_IPCMSG_LUASTRING,
+    GH_IPCMSG_LUAFILE,
     GH_IPCMSG_FUNCTIONRETURN,
 
     // subjail send
@@ -76,6 +82,18 @@ typedef struct {
 GH_IPCMSG_ALIGN
 typedef struct {
     gh_ipcmsg_type type;
+    pid_t pid;
+} gh_ipcmsg_killsubjail;
+
+GH_IPCMSG_ALIGN
+typedef struct {
+    gh_ipcmsg_type type;
+    pid_t pid;
+} gh_ipcmsg_subjaildead;
+
+GH_IPCMSG_ALIGN
+typedef struct {
+    gh_ipcmsg_type type;
     int index;
     pid_t pid;
 } gh_ipcmsg_subjailalive;
@@ -92,6 +110,19 @@ typedef struct {
     gh_ipcmsg_type type;
     char content[GH_IPCMSG_LUASTRING_MAXSIZE];
 } gh_ipcmsg_luastring;
+
+GH_STATICASSERT(
+    sizeof(gh_ipcmsg_luastring) <= GH_IPCMSG_MAXSIZE,
+    "Lua result message exceeds max IPC message size"
+);
+
+#define GH_IPCMSG_LUAFILE_CHUNKNAMEMAX 512
+GH_IPCMSG_ALIGN
+typedef struct {
+    gh_ipcmsg_type type;
+    int fd;
+    char chunk_name[GH_IPCMSG_LUAFILE_CHUNKNAMEMAX];
+} gh_ipcmsg_luafile;
 
 GH_IPCMSG_ALIGN
 typedef struct {
@@ -110,7 +141,7 @@ typedef struct {
 } gh_ipcmsg_luaresult;
 
 GH_STATICASSERT(
-    sizeof(gh_ipcmsg_luaresult) < GH_IPCMSG_MAXSIZE,
+    sizeof(gh_ipcmsg_luaresult) <= GH_IPCMSG_MAXSIZE,
     "Lua result message exceeds max IPC message size"
 );
 

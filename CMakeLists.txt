@@ -51,6 +51,9 @@ GhostAddCFlags(-Wno-unused-value)
 GhostAddCFlags(-Wno-unknown-pragmas)
 # RATIONALE: Sometimes #pragma clang is used instead of #pragma GCC to only affect Clang.
 
+GhostAddCFlags(-fno-strict-aliasing)
+# The library may potentially contain strict aliasing violations. It's safer to turn this on than hope everything works correctly.
+
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ")
 
 set(enumgen "tools/enumgen.py")
@@ -65,6 +68,18 @@ add_custom_command(
     DEPENDS ${enum_error_src}
 )
 add_custom_target(ghost-enum-error DEPENDS ${enum_error_out})
+
+set(enum_permfs_mode_src "intermediate/gh_permfs_mode.csv")
+set(enum_permfs_mode_out_header "${PROJECT_SOURCE_DIR}/include/ghost/generated/gh_permfs_mode.h")
+set(enum_permfs_mode_out_source "${PROJECT_SOURCE_DIR}/src/ghost/generated/gh_permfs_mode.c")
+set(enum_permfs_mode_out ${enum_permfs_mode_out_header} ${enum_permfs_mode_out_source})
+
+add_custom_command(
+    OUTPUT ${enum_permfs_mode_out}
+    COMMAND ${PROJECT_SOURCE_DIR}/tools/enumgen.py -p GH_PERMFS_ -c "${PROJECT_SOURCE_DIR}/intermediate/gh_permfs_mode.csv" -H ${enum_permfs_mode_out_header} -S ${enum_permfs_mode_out_source} -n gh_permfs_mode
+    DEPENDS ${enum_permfs_mode_src}
+)
+add_custom_target(ghost-enum-permfs_mode DEPENDS ${enum_permfs_mode_out})
 
 function(GhostCodegenTarget target_name)
     set(codegen "${PROJECT_SOURCE_DIR}/tools/codegen.py")
@@ -106,7 +121,10 @@ GhostCodegenTarget(
 )
 
 file(GLOB ghost_src "src/ghost/*.c")
+file(GLOB ghost_perms_src "src/ghost/perms/*.c")
+list(APPEND ghost_src ${ghost_perms_src})
 list(APPEND ghost_src "src/ghost/generated/gh_error.c")
+list(APPEND ghost_src "src/ghost/generated/gh_permfs_mode.c")
 file(GLOB ghost_inc "include/ghost/*.h")
 
 set(cembed "${PROJECT_SOURCE_DIR}/tools/cembed.py")
@@ -118,17 +136,17 @@ add_custom_command(
 )
 add_custom_target(ghost-jail-luainit DEPENDS "${PROJECT_BINARY_DIR}/lua_init.c")
 
-set(luajit_include "${CMAKE_BINARY_DIR}/luajit/usr/local/include" )
-add_library(libluajit SHARED IMPORTED)
+set(luajit_include "${CMAKE_BINARY_DIR}/luajit/usr/local/include")
+add_library(libluajit STATIC IMPORTED)
 add_dependencies(libluajit luajit)
-set_target_properties(libluajit PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/libs/luajit/src/libluajit.so")
+set_target_properties(libluajit PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/libs/luajit/src/libluajit.a")
 
 list(APPEND ghost_src ${enum_error_out_source})
 list(APPEND ghost_src "${PROJECT_BINARY_DIR}/lua_init.c")
 list(APPEND ghost_inc ${enum_error_out_header})
 
 add_library(libghost-nojail SHARED "${ghost_src}")
-add_dependencies(libghost-nojail ghost-enum-error ghost-enum-msgtype ghost-jail-luainit)
+add_dependencies(libghost-nojail ghost-enum-error ghost-enum-permfs_mode ghost-jail-luainit)
 set_target_properties(libghost-nojail PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(libghost-nojail PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 set_target_properties(libghost-nojail PROPERTIES OUTPUT_NAME "ghost")
@@ -156,10 +174,12 @@ ExternalProject_Add(luajit
 file(GLOB_RECURSE jail_src "src/jail/*.c")
 file(GLOB_RECURSE jail_inc "include/jail/*.h")
 
+set(libs_include "${CMAKE_SOURCE_DIR}/libs")
+
 add_executable(ghost-jail "${jail_src}")
 add_dependencies(ghost-jail luajit)
-target_link_libraries(ghost-jail PUBLIC libghost-nojail libluajit)
-target_include_directories(ghost-jail PRIVATE ${luajit_include})
+target_link_libraries(ghost-jail PUBLIC libghost-nojail libluajit m)
+target_include_directories(ghost-jail PRIVATE ${luajit_include} ${libs_include})
 
 add_custom_command(
     OUTPUT "${PROJECT_BINARY_DIR}/embedded_jail.c"
@@ -183,7 +203,7 @@ add_library(
     ${ghost_src} ${ghost_embedded_jail_src}
 )
 
-add_dependencies(libghost ghost-embedded-jail ghost-jail ghost-jail-luainit)
+add_dependencies(libghost ghost-enum-error ghost-enum-permfs_mode ghost-embedded-jail ghost-jail ghost-jail-luainit)
 set_target_properties(libghost PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(libghost PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 set_target_properties(libghost PROPERTIES OUTPUT_NAME "ghost")

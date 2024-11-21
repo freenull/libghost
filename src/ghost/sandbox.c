@@ -75,6 +75,8 @@ gh_result gh_sandbox_ctor(gh_sandbox * sandbox, gh_sandboxoptions options) {
                 return GHR_SANDBOX_CLEANIPCFAIL;
             }
 
+            (void)waitpid(sandbox->pid, NULL, 0);
+
             return ghr_errno(GHR_SANDBOX_CLOSESOCKFAIL);
         }
 

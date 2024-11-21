@@ -38,6 +38,7 @@ class EnumEntry:
 
 
 prev_value = -1
+prev_bitflag = -1
 
 entries = []
 with open(args.csv, "r") as csv_f:
@@ -55,7 +56,16 @@ with open(args.csv, "r") as csv_f:
         value = row[1]
         description = row[2]
 
-        if value.strip() == "":
+        if value.strip().startswith("::"):
+            value = value.strip()[len("::"):]
+            if value.strip() == "":
+                value = 1 << (prev_bitflag + 1)
+                prev_bitflag += 1
+            else:
+                value = 1 << int(value)
+                prev_value = value
+                prev_bitflag = int(value)
+        elif value.strip() == "":
             value = prev_value + 1
             prev_value = value
         else:
@@ -72,7 +82,9 @@ last_entry = entries[-1]
 
 header_rel_from_source = os.path.relpath(args.header, os.path.dirname(args.source))
 
-os.makedirs(os.path.dirname(args.header), exist_ok = True)
+header_dirname = os.path.dirname(args.header)
+if header_dirname != "":
+    os.makedirs(header_dirname, exist_ok = True)
 with open(args.header, "w") as header_f:
     write_generated_notice(header_f)
 
@@ -86,7 +98,9 @@ with open(args.header, "w") as header_f:
     print(f"{args.name} {args.name}_fromname(const char * name);", file = header_f)
 
 
-os.makedirs(os.path.dirname(args.source), exist_ok = True)
+source_dirname = os.path.dirname(args.source)
+if source_dirname != "":
+    os.makedirs(source_dirname, exist_ok = True)
 with open(args.source, "w") as source_f:
     write_generated_notice(source_f)
     print(f"#include \"{header_rel_from_source}\"", file = source_f)

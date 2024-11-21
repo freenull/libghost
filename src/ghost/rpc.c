@@ -221,7 +221,8 @@ gh_result gh_rpc_disposeframe(gh_rpc * rpc, gh_rpcframe * frame) {
     return GHR_OK;
 }
 
-bool gh_rpcframe_argv(gh_rpcframe * frame, size_t index, void ** out_ptr) {
+bool gh_rpcframe_argv(gh_rpcframe * frame, size_t index, size_t size, void ** out_ptr) {
+    if (frame->args[index].size != size) return false;
     if (index >= frame->arg_count) {
         if (out_ptr != NULL) *out_ptr = NULL;
         return false;

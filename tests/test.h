@@ -3,7 +3,7 @@
 #define assert(expr) do { \
         int assert__result = (expr); \
         if (!assert__result) { \
-            fprintf(stderr, "Assertion failed: %s", # expr); \
+            fprintf(stderr, "Assertion failed: %s\n", # expr); \
             raise(SIGABRT); \
         } \
     } while(0)
