@@ -22,8 +22,28 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install Valgrind
-      run: sudo apt install -y valgrind
+    - name: Retrieve Valgrind
+      run: git clone https://sourceware.org/git/valgrind.git ${{github.workspace}}/valgrind
+
+    - name: Apply patch for execveat fix
+      working-directory: ${{github.workspace}}/valgrind
+      run: git am < ${{github.workspace}}/tools/valgrind-execveat-fix.mbox
+
+    - name: Build Valgrind (autogen)
+      working-directory: ${{github.workspace}}/valgrind
+      run: ./autogen.sh
+
+    - name: Build Valgrind (configure)
+      working-directory: ${{github.workspace}}/valgrind
+      run: ./configure --prefix=/usr
+
+    - name: Build Valgrind (make)
+      working-directory: ${{github.workspace}}/valgrind
+      run: make
+
+    - name: Build Valgrind (install)
+      working-directory: ${{github.workspace}}/valgrind
+      run: make install
 
     - name: Retrieve submodules
       run: git submodule update --init --recursive
