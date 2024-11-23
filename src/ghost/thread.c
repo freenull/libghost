@@ -7,8 +7,9 @@
 #include <ghost/thread.h>
 #include <ghost/rpc.h>
 #include <ghost/ipc.h>
+#include <ghost/perms/prompt.h>
 
-gh_result gh_sandbox_newthread(gh_sandbox * sandbox, gh_alloc * alloc, const char * name, const char * safe_id, gh_thread * out_thread) {
+gh_result gh_sandbox_newthread(gh_sandbox * sandbox, gh_rpc * rpc, const char * name, const char * safe_id, gh_thread * out_thread) {
     gh_ipc direct_ipc;
     int direct_peerfd;
 
@@ -63,12 +64,12 @@ gh_result gh_sandbox_newthread(gh_sandbox * sandbox, gh_alloc * alloc, const cha
 
     out_thread->userdata = NULL;
 
-    res = gh_rpc_ctor(&out_thread->rpc, alloc);
-    if (ghr_iserr(res)) goto fail_rpc_ctor;
+    out_thread->rpc = rpc;
+
+    gh_rpc_incthreadrefcount(rpc);
 
     return res;
 
-fail_rpc_ctor:
 fail_hello:
 fail_close:
     if (kill(subjail_pid, SIGKILL) < 0) res = ghr_errno(GHR_SANDBOX_THREADRECOVERYKILLFAIL);
@@ -82,10 +83,9 @@ fail_ipc:
 }
 
 gh_result gh_thread_dtor(gh_thread * thread) {
-    gh_result res = gh_rpc_dtor(&thread->rpc);
-    if (ghr_iserr(res)) return res;
+    gh_rpc_decthreadrefcount(thread->rpc);
 
-    res = gh_ipc_dtor(&thread->ipc);
+    gh_result res = gh_ipc_dtor(&thread->ipc);
     if (ghr_iserr(res)) return res;
     
     return GHR_OK;
@@ -133,7 +133,7 @@ static gh_result thread_handlemsg(gh_thread * thread, gh_ipcmsg * msg, gh_thread
         }
         gh_result res = thread_handlemsg_functioncall(thread, call_msg);
         if (ghr_is(res, GHR_RPC_MISSINGFUNC)) {
-            notif->function.missing = true;
+            if (notif != NULL) notif->function.missing = true;
             return GHR_OK;
         }
 
@@ -192,7 +192,7 @@ gh_result gh_thread_forcekill(gh_thread * thread) {
 }
 
 inline gh_rpc * gh_thread_rpc(gh_thread * thread) {
-    return &thread->rpc;
+    return thread->rpc;
 }
 
 gh_result gh_thread_runstring(gh_thread * thread, const char * s, size_t s_len, int * script_id) {

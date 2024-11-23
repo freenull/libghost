@@ -2,12 +2,14 @@
 #include <string.h>
 #include <sys/uio.h>
 #include <fcntl.h>
+#include <stdatomic.h>
 #include <ghost/result.h>
 #include <ghost/thread.h>
 #include <ghost/ipc.h>
 #include <ghost/rpc.h>
 #include <ghost/alloc.h>
 #include <ghost/dynamic_array.h>
+#include <ghost/perms/perms.h>
 
 static const gh_dynamicarrayoptions rpc_daopts = {
     .initial_capacity = GH_RPC_INITIALCAPACITY,
@@ -18,16 +20,27 @@ static const gh_dynamicarrayoptions rpc_daopts = {
     .userdata = NULL
 };
 
-gh_result gh_rpc_ctor(gh_rpc * rpc, gh_alloc * alloc) {
+gh_result gh_rpc_ctor(gh_rpc * rpc, gh_alloc * alloc, gh_permprompter prompter) {
     rpc->alloc = alloc;
+    rpc->prompter = prompter;
+    atomic_store(&rpc->thread_refcount, 0);
+
+    gh_result res = gh_perms_ctor(&rpc->perms, alloc);
+    if (ghr_iserr(res)) return res;
+
     return gh_dynamicarray_ctor(GH_DYNAMICARRAY(rpc), &rpc_daopts);
 }
 
 gh_result gh_rpc_dtor(gh_rpc * rpc) {
+    gh_result res = gh_perms_dtor(&rpc->perms);
+    if (ghr_iserr(res)) return res;
+
     return gh_dynamicarray_dtor(GH_DYNAMICARRAY(rpc), &rpc_daopts);
 }
 
 gh_result gh_rpc_register(gh_rpc * rpc, const char * name, gh_rpcfunction_func * func) {
+    if (gh_rpc_isinuse(rpc)) return GHR_RPC_INUSE;
+
     gh_rpcfunction function = {0};
     strncpy(function.name, name, GH_RPCFUNCTION_MAXNAME - 1);
     function.name[GH_RPCFUNCTION_MAXNAME - 1] = '\0';

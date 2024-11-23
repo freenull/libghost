@@ -1,0 +1,13 @@
+filesystem node {
+    "/tmp" {
+        self accept "createdir" "read"
+        self reject "write"
+        self prompt "createfile"
+        children accept "read"
+        children reject "write"
+    }
+    "/foobar.txt" {
+        self accept "read"
+    }
+}
+

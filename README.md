@@ -35,6 +35,14 @@ Run tests:
 make -C build test
 ```
 
+> [!WARNING]
+> Tests that create a sandbox will fail with the latest version of Valgrind due to a [bug](https://bugs.kde.org/show_bug.cgi?id=496353).  
+> You may apply [this patch](tools/valgrind-execveat-fix.mbox) to fix the bug and run all tests. To apply it to the current Valgrind git source tree, use:
+>
+> ```sh
+> git am < /path/to/tools/valgrind-execveat-fix.mbox
+> ```
+
 There are 4 steps to the build:
 
 * Enums are generated from CSV files in `intermediate/`.

@@ -39,13 +39,16 @@ int main(void) {
 
     ghr_assert(gh_sandbox_ctor(&sandbox, options));
 
+    gh_rpc rpc;
+    ghr_assert(gh_rpc_ctor(&rpc, &alloc, gh_permprompter_simpletui(STDIN_FILENO)));
+    ghr_assert(gh_rpc_register(&rpc, "print", func_print));
+
     gh_thread thread;
-    ghr_assert(gh_sandbox_newthread(&sandbox, &alloc, "thread", "thread", &thread));
-    gh_rpc_register(gh_thread_rpc(&thread), "print", func_print);
+    ghr_assert(gh_sandbox_newthread(&sandbox, &rpc, "thread", "thread", &thread));
 
     char s[] =
         "local ghost = require('ghost')\n"
-        "local res = ghost.call('print', 'string', 'Hello, world!')\n"
+        "local res = ghost.call('print', 'int', 'Hello, world!')\n"
         "print('result:', res)\n"
         ;
 
@@ -64,6 +67,8 @@ int main(void) {
     }
     ghr_assert(gh_thread_requestquit(&thread));
     ghr_assert(gh_thread_dtor(&thread));
+
+    ghr_assert(gh_rpc_dtor(&rpc));
 
     ghr_assert(gh_sandbox_requestquit(&sandbox));
     

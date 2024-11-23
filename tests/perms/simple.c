@@ -6,7 +6,6 @@
  *   - Registers an 'open' function with the RPC that uses gh_perms to request
  *     permission to the passed in file path.
  *     If granted, the function opens and returns a new file descriptor.
- *   - Attaches the gh_perms object (with the simpletui prompter) to the gh_thread
  *   - Executes a Lua script that asks for permission to a file twice -
  *     first through pcall, then in the root (so that it can fail)
  *   - Sends a single input of 'x\n' to the simpletui prompter, then closes the
@@ -29,10 +28,6 @@
 #include <ghost/perms/prompt.h>
 #include <ghost/perms/perms.h>
 
-typedef struct {
-    gh_perms * perms;
-} thread_ud;
-
 static void func_open(gh_rpc * rpc, gh_rpcframe * frame) {
     (void)rpc;
 
@@ -52,10 +47,8 @@ static void func_open(gh_rpc * rpc, gh_rpcframe * frame) {
 
     printf("open call: path = %s, flags = %d\n", path_buf, (int)*flags_arg);
 
-    thread_ud * ud = (thread_ud *)frame->thread->userdata;
-
     int fd;
-    gh_result res = gh_perms_openat(ud->perms, frame->thread, AT_FDCWD, path_buf, (int)*flags_arg, 0, &fd);
+    gh_result res = gh_perms_openat(&frame->thread->rpc->perms, frame->thread, AT_FDCWD, path_buf, (int)*flags_arg, 0, &fd);
     if (ghr_iserr(res)) {
         gh_rpcframe_failhere(frame, res);
     }
@@ -74,27 +67,22 @@ int main(void) {
 
     gh_alloc alloc = gh_alloc_default();
 
-    gh_thread thread;
-    ghr_assert(gh_sandbox_newthread(&sandbox, &alloc, "thread", "my thread", &thread));
-
-    ghr_assert(gh_rpc_register(&thread.rpc, "open", func_open));
-
     int pipefd[2];
     assert(pipe(pipefd) >= 0);
 
-    gh_perms perms;
     gh_permprompter prompter = gh_permprompter_simpletui(pipefd[0]);
+    /* gh_permprompter prompter = gh_permprompter_simpletui(STDIN_FILENO); */
+
+    gh_rpc rpc;
+    ghr_assert(gh_rpc_ctor(&rpc, &alloc, prompter));
+    ghr_assert(gh_rpc_register(&rpc, "open", func_open));
+
+    gh_thread thread;
+    ghr_assert(gh_sandbox_newthread(&sandbox, &rpc, "thread", "my thread", &thread));
 
     assert(write(pipefd[1], "x\n", 2) == 2);
 
     assert(close(pipefd[1]) == 0);
-
-    ghr_assert(gh_perms_ctor(&perms, &alloc, &prompter));
-
-    thread_ud ud = {
-        .perms = &perms
-    };
-    ghr_assert(gh_thread_attachuserdata(&thread, &ud));
 
     char tempfile[] = "/tmp/gh-perms-test-XXXXXX";
     int fd;
@@ -122,11 +110,12 @@ int main(void) {
     assert(unlink(tempfile) == 0);
 
     ghr_assert(gh_bytebuffer_dtor(&buf));
-    ghr_assert(gh_perms_dtor(&perms));
     ghr_assert(gh_thread_requestquit(&thread));
     ghr_assert(gh_thread_dtor(&thread));
     ghr_assert(gh_sandbox_requestquit(&sandbox));
     ghr_assert(gh_sandbox_dtor(&sandbox));
+
+    ghr_assert(gh_rpc_dtor(&rpc));
     assert(close(pipefd[0]) == 0);
     return 0;
 }

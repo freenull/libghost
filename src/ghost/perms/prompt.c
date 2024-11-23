@@ -7,26 +7,6 @@
 #include <ghost/perms/perms.h>
 #include <ghost/perms/prompt.h>
 
-bool gh_permrequest_isgroup(const gh_permrequest * req, const char * group) {
-    return strncmp(req->group, group, strlen(group) + 1) == 0;
-}
-
-bool gh_permrequest_isresource(const gh_permrequest * req, const char * resource) {
-    return strncmp(req->resource, resource, strlen(resource) + 1) == 0;
-}
-
-const gh_permrequest_field * gh_permrequest_getfield(const gh_permrequest * req, const char * key) {
-    size_t key_len = strlen(key);
-    for (size_t i = 0; i < GH_PERMREQUEST_MAXFIELDS; i++) {
-        const gh_permrequest_field * field = req->fields + i;
-        if (strncmp(field->key, key, key_len) == 0) {
-            return field;
-        }
-    }
-
-    return NULL;
-}
-
 gh_permprompter gh_permprompter_new(gh_permprompter_func * func, void * userdata) {
     return (gh_permprompter) {
         .func = func,
@@ -44,13 +24,25 @@ static const char * human_readable_filesystem_mode(const char * s) {
     if (strcmp(s, "read") == 0) return "Read the contents of the file";
     if (strcmp(s, "write") == 0) return "Write into the file or truncate it";
     if (strcmp(s, "unlink") == 0) return "Remove the file or empty directory at the requested path";
-
-    if (strcmp(s, "children/createfile") == 0) return "Create a regular file underneath the tree of this directory";
-    if (strcmp(s, "children/createdir") == 0) return "Create a directory underneath the tree of this directory";
-    if (strcmp(s, "children/read") == 0) return "Read files inside the tree of this directory";
-    if (strcmp(s, "children/write") == 0) return "Write into or truncate files underneath the tree of this directory";
-    if (strcmp(s, "children/unlink") == 0) return "Remove files or empty directoriesunderneath the tree of this directory";
     return NULL;
+}
+
+static gh_result simpletui_printmode(const gh_permrequest_field * field) {
+    char mode_str[field->value_len + 1];
+    strncpy(mode_str, field->value, field->value_len + 1);
+
+    char * strtok_saveptr = NULL;
+
+    char * s = strtok_r(mode_str, ",", &strtok_saveptr);
+    do {
+        const char * human_readable = human_readable_filesystem_mode(s);
+        if (human_readable == NULL) return ghr_errnoval(GHR_PERMPROMPT_REJECTEDUNKNOWN, EINVAL);
+        printf("- %s\n", human_readable);
+
+        s = strtok_r(NULL, ",", &strtok_saveptr);
+    } while (s != NULL);
+
+    return GHR_OK;
 }
 
 static gh_result simpletui_prompter_filesystem(const gh_permrequest * req, void * userdata, gh_permresponse * out_response) {
@@ -58,30 +50,31 @@ static gh_result simpletui_prompter_filesystem(const gh_permrequest * req, void 
     
     const gh_permrequest_field * path = gh_permrequest_getfield(req, "path");
     if (path == NULL) return GHR_PERMPROMPT_MISSINGFIELD;
-    const gh_permrequest_field * mode = gh_permrequest_getfield(req, "mode");
-    if (mode == NULL) return GHR_PERMPROMPT_MISSINGFIELD;
+    const gh_permrequest_field * mode_self = gh_permrequest_getfield(req, "mode_self");
+    const gh_permrequest_field * mode_children = gh_permrequest_getfield(req, "mode_children");
+    if (mode_self == NULL && mode_children == NULL) return GHR_PERMPROMPT_MISSINGFIELD;
 
-    if (mode->value_len == 0) return ghr_errnoval(GHR_PERMPROMPT_REJECTEDUNKNOWN, EINVAL);
+    if (mode_self->value_len == 0 && mode_children->value_len == 0) return ghr_errnoval(GHR_PERMPROMPT_REJECTEDUNKNOWN, EINVAL);
 
     if (gh_permrequest_isresource(req, "node")) {
         printf("\n");
         printf("== INTERACTIVE PERMISSION REQUEST == \n");
         printf("Source '%s' is requesting access to the file path '%s'.\n", req->source, req->resource);
-        printf("If you accept, the script will have access to do the following:\n");
 
-        char mode_str[mode->value_len + 1];
-        strncpy(mode_str, mode->value, mode->value_len + 1);
+        gh_str path_str = gh_str_fromc(path->value, path->value_len, path->value_len);
 
-        char * strtok_saveptr = NULL;
+        if (mode_self != NULL && mode_self->value_len > 0)  {
+            printf("If you accept, the script will have access to do the following with '"GH_STR_FORMAT"':\n", GH_STR_ARG(path_str));
+            gh_result res = simpletui_printmode(mode_self);
+            if (ghr_iserr(res)) return res;
+        }
 
-        char * s = strtok_r(mode_str, ",", &strtok_saveptr);
-        do {
-            const char * human_readable = human_readable_filesystem_mode(s);
-            if (human_readable == NULL) return ghr_errnoval(GHR_PERMPROMPT_REJECTEDUNKNOWN, EINVAL);
-            printf("- %s\n", human_readable);
+        if (mode_children != NULL && mode_children->value_len > 0)  {
+            printf("If you accept, the script will have access to do the following with ANY files and directories inside '"GH_STR_FORMAT"':\n", GH_STR_ARG(path_str));
+            gh_result res = simpletui_printmode(mode_children);
+            if (ghr_iserr(res)) return res;
+        }
 
-            s = strtok_r(NULL, ",", &strtok_saveptr);
-        } while (s != NULL);
         printf("\nIf you reject the request, the script will not receive any new permissions.\n");
         printf("The script will receive a notification that this request failed unless you respond with '!'.\n");
 

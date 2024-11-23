@@ -1,8 +1,10 @@
 #ifndef GHOST_RPC_H
 #define GHOST_RPC_H
 
-#include "ghost/ipc.h"
+#include <stdatomic.h>
+#include <ghost/ipc.h>
 #include <ghost/dynamic_array.h>
+#include <ghost/perms/perms.h>
 
 #ifndef GH_TYPEDEF_THREAD
 typedef struct gh_thread gh_thread;
@@ -47,11 +49,29 @@ struct gh_rpcfunction {
 struct gh_rpc {
     gh_alloc * alloc;
     gh_rpcfunction * buffer;
+    gh_permprompter prompter;
+    gh_perms perms;
     size_t size;
     size_t capacity;
+    _Atomic ssize_t thread_refcount;
 };
 
-gh_result gh_rpc_ctor(gh_rpc * rpc, gh_alloc * alloc);
+__attribute__((always_inline))
+static inline void gh_rpc_incthreadrefcount(gh_rpc * rpc) {
+    atomic_fetch_add(&rpc->thread_refcount, 1);
+}
+
+__attribute__((always_inline))
+static inline void gh_rpc_decthreadrefcount(gh_rpc * rpc) {
+    atomic_fetch_sub(&rpc->thread_refcount, 1);
+}
+
+__attribute__((always_inline))
+static inline bool gh_rpc_isinuse(gh_rpc * rpc) {
+    return atomic_load(&rpc->thread_refcount) > 0;
+}
+
+gh_result gh_rpc_ctor(gh_rpc * rpc, gh_alloc * alloc, gh_permprompter prompter);
 gh_result gh_rpc_dtor(gh_rpc * rpc);
 gh_result gh_rpc_register(gh_rpc * rpc, const char * name, gh_rpcfunction_func * func);
 gh_result gh_rpc_newframe(gh_rpc * rpc, const char * name, gh_thread * thread, size_t arg_count, gh_rpcarg * args, gh_rpcarg return_arg, gh_rpcframe * out_frame);

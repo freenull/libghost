@@ -276,10 +276,10 @@ static gh_result ts_makederivatives_fromtypename(gh_ts * ts, const char * name) 
     char buf[name_len + 1];
     strncpy(buf, name, name_len + 1);
 
-    gh_str s = gh_str_fromc(buf, sizeof(buf));
+    gh_str s = gh_str_fromz(buf, sizeof(buf));
 
     // if ends with '*', trim and make pointer
-    if (gh_str_endswith(&s, "*", 1)) {
+    if (gh_str_endswithc(s, "*", 1)) {
         gh_str_trimrightn(&s, 1);
         gh_str_trimrightchar(&s, ' ');
         gh_str_insertnull(&s);
@@ -291,7 +291,7 @@ static gh_result ts_makederivatives_fromtypename(gh_ts * ts, const char * name) 
 
         res = gh_ts_append(ts, type);
         if (ghr_iserr(res)) return res;
-    } else if (gh_str_endswith(&s, "[]", 2)) {
+    } else if (gh_str_endswithc(s, "[]", 2)) {
         gh_str_trimrightn(&s, 2);
         gh_str_trimrightchar(&s, ' ');
         gh_str_insertnull(&s);
@@ -303,10 +303,10 @@ static gh_result ts_makederivatives_fromtypename(gh_ts * ts, const char * name) 
 
         res = gh_ts_append(ts, type);
         if (ghr_iserr(res)) return res;
-    } else if (gh_str_endswith(&s, "]", 1)) {
+    } else if (gh_str_endswithc(s, "]", 1)) {
 
         size_t lbrace_pos = 0;
-        if (!gh_str_rpos(&s, '[', &lbrace_pos)) return GHR_TS_MISSINGTYPE;
+        if (!gh_str_rpos(s, '[', &lbrace_pos)) return GHR_TS_MISSINGTYPE;
         if (lbrace_pos + 1 >= s.size) return GHR_TS_MISSINGTYPE;
 
         gh_str_trimrightn(&s, 1);

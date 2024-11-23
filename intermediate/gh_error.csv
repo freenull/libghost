@@ -99,6 +99,7 @@ TS_INVALIDTYPE,,Type of kind GH_TSTYPE_INVALID passed to function expecting vali
 TS_EMPTYNAME,,Type may not have empty name
 TS_ARRAYTOOBIG,,Static array size is too large
 
+RPC_INUSE,,Cannot register new functions in an RPC object that is in use by threads
 RPC_MISSINGFUNC,,Function does not exist
 RPC_UNEXECUTED,,Frame has not been executed yet
 RPC_EXECUTED,,Frame has already been executed
@@ -130,12 +131,16 @@ TEST_GENERIC,,Generic error from test case
 
 PROCFD_INVALIDFD,,Invalid file descriptor passed
 PROCFD_BIGFDPATH,,File descriptor too large to retrieve path
-PROCFD_PROCPATHFDOPEN,,Failed opening /proc/self/fd
-PROCFD_PROCPATHFDCLOSE,,Failed closing /proc/self/fd file descriptor
 PROCFD_FDPATHCONSTRUCT,,Failed constructing /proc/self/fd/XXXX path to retrieve real path of file descriptor
 PROCFD_READLINK,,Failed reading /proc/self/fd/XXXX link contents
 PROCFD_LARGELINK,,/proc/self/fd/XXXX link is too large to read
 PROCFD_REOPENFAIL,,Failed safely reopening file through procfs
+PROCFD_PROCPATHFDOPEN,,Failed opening /proc/self/fd
+PROCFD_PROCPATHFDCLOSE,,Failed closing /proc/self/fd
+
+PATHFD_OPENFAIL,,Failed opening pathfd
+PATHFD_CLOSEFAIL,,Failed closing pathfd
+PATHFD_LARGETRAILINGNAME,,The last element of non-existent file/directory path is too large to store as a pathfd
 
 PERMFS_STATFAIL,,fstat(2) on file descriptor failed
 PERMFS_BADTYPE,,File type cannot be acted upon by permfs (not a regular file, directory or symlink)
@@ -155,5 +160,29 @@ PERMPROMPT_MISSINGFIELD,,Required field was missing from prompter request
 PERMPROMPT_REJECTED,,Permission request was rejected by prompter
 PERMPROMPT_REJECTEDUSER,,User rejected permission request
 PERMPROMPT_REJECTEDUNKNOWN,,Permission request was rejected for unknown reason
+
+PERMPARSER_FAILEDSEEK,,Failed seeking file descriptor when constructing permission parser
+PERMPARSER_FAILEDMMAP,,Tokenizer failed mapping file to memory
+PERMPARSER_FAILEDMUNMAP,,Tokenizer failed unmapping file from memory
+PERMPARSER_UNEXPECTEDTOKEN,,Unexpected token
+PERMPARSER_UNTERMINATEDSTRING,,Unterminated string parameter
+PERMPARSER_RESOURCEPARSERLIMIT,,Reached limit of resource parsers
+PERMPARSER_UNKNOWNRESOURCE,,Unknown group or resource ID
+PERMPARSER_EXPECTEDGROUPID,,Expected group ID
+PERMPARSER_LARGEGROUPID,,Group ID is too long
+PERMPARSER_EXPECTEDRESOURCEID,,Expected resource ID
+PERMPARSER_LARGERESOURCEID,,Resource ID is too long
+PERMPARSER_EXPECTEDFIELD,,Expected field key
+PERMPARSER_LARGEFIELD,,Field key is too long
+PERMPARSER_EXPECTEDRESOURCEBEGIN,,Expected resource block begin ('{')
+PERMPARSER_EXPECTEDRESOURCEEND,,Expected resource block end ('}')
+PERMPARSER_EXPECTEDENTRY,,Expected entry key
+PERMPARSER_EXPECTEDENTRYBEGIN,,Expected entry block begin ('{')
+PERMPARSER_EXPECTEDENTRYEND,,Expected entry block end ('}')
+PERMPARSER_NOMATCH,,Resource parser does not match this group or resource ID
+PERMPARSER_UNKNOWNFIELD,,Unknown field
+PERMPARSER_EXPECTEDSTRING,,Expected string
+PERMPARSER_EXPECTEDIDENTIFIER,,Expected identifier
+PERMPARSER_RESOURCEPARSEFAIL,,Failed parsing resource
 
 UNKNOWN,,Unknown error

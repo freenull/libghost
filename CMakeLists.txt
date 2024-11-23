@@ -27,6 +27,8 @@ if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
     # RATIONALE: Intended for C++. Triggers on simple access to stack array in C. Bogus.
     GhostAddCFlags(-Wno-extra-semi-stmt)
     # RATIONALE: Messes with macros that can't be done any other way than with a useless semicolon.
+    GhostAddCFlags(-Wno-assign-enum)
+    # RATIONALE: This makes using bitflags impossible, as it wants all assignments to an enum to be the value of a single enum key.
 elseif(CMAKE_C_COMPILER_ID STREQUAL "GNU")
     GhostAddCFlags(-Wextra -Wall)
 else()

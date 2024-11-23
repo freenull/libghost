@@ -17,9 +17,13 @@ int main(void) {
     req.fields[0].value = "/foo/bar/baz";
     req.fields[0].value_len = strlen(req.fields[0].value);
 
-    strcpy(req.fields[1].key, "mode");
-    req.fields[1].value = "read,createdir,children/read,children/write";
+    strcpy(req.fields[1].key, "mode_self");
+    req.fields[1].value = "read,createdir";
     req.fields[1].value_len = strlen(req.fields[1].value);
+
+    strcpy(req.fields[2].key, "mode_children");
+    req.fields[2].value = "read,write";
+    req.fields[2].value_len = strlen(req.fields[2].value);
 
     assert(write(pipefd[1], "a\n", 2) == 2);
     gh_permresponse resp = {0};

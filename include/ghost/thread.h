@@ -43,7 +43,7 @@ struct gh_thread {
     char safe_id[GH_THREAD_MAXSAFEID];
     pid_t pid;
     gh_ipc ipc;
-    gh_rpc rpc;
+    gh_rpc * rpc;
     void * userdata;
 };
 
@@ -54,7 +54,7 @@ typedef struct gh_thread gh_thread;
 
 #define GH_THREAD_LUAINFO_TIMEOUTMS 1000
 
-gh_result gh_sandbox_newthread(gh_sandbox * sandbox, gh_alloc * alloc, const char * name, const char * safe_id, gh_thread * out_thread);
+gh_result gh_sandbox_newthread(gh_sandbox * sandbox, gh_rpc * rpc, const char * name, const char * safe_id, gh_thread * out_thread);
 gh_result gh_thread_dtor(gh_thread * thread);
 gh_result gh_thread_attachuserdata(gh_thread * thread, void * userdata);
 gh_result gh_thread_process(gh_thread * thread, gh_threadnotif * notif);

@@ -1,0 +1,114 @@
+MIME-Version: 1.0
+Date: Sat, 16 Nov 2024 18:43:14 +0100
+References: <CADYPv1VRV3C5Lf2pN-JmchXFydT7AUKC1SvfG0TzwqBOGzucsw@mail.gmail.com>
+In-Reply-To: <CADYPv1VRV3C5Lf2pN-JmchXFydT7AUKC1SvfG0TzwqBOGzucsw@mail.gmail.com>
+Message-ID: <CADYPv1V+DLvidEZsgOHdNoKyPgz=h=SPtyL_z9N_gkio6tsNxg@mail.gmail.com>
+Subject: Re: [PATCH] libcfile: Resolve deleted fd to procfs path
+From: Dominik Banaszak <freenullptr@gmail.com>
+To: valgrind-developers@lists.sourceforge.net
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Previous commit linked the wrong bug report. Sorry.
+
+-- >8 --
+Applies to Linux and Solaris.
+
+If the file referenced by the file descriptor passed to execveat(2) has
+been deleted prior to the syscall or is an anonymous file created by
+memfd_create(2), i.e. if the file has no hard links (st_nlinks =3D=3D 0),
+the execveat wrapper would fail with errno set to ENOENT.
+
+The execveat wrapper uses VG_(resolve_filename) to retrieve an absolute
+path to the file or directory pointed to by the dirfd argument. This
+function uses readlink(2) to read the appropriate link in the procfs
+directory /proc/self/fd. In the case of files with no hard links,
+the output of readlink contains the suffix ' (deleted)', which leads to
+execveat passing the incorrect path on to execve. Links in procfs to
+files created with memfd_create additionally point to a bogus path in
+the format '/memfd:NAME', where 'NAME' is determined by an argument to
+the function.
+
+This commit changes VG_(resolve_filename) to execute a stat on the
+procfs link and check if nlinks is equal to 0. If so, the procfs path is
+returned and readlink is not called.
+
+https://bugs.kde.org/show_bug.cgi?id=3D496353
+---
+ coregrind/m_libcfile.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/coregrind/m_libcfile.c b/coregrind/m_libcfile.c
+index fb93b4867..2c72e3185 100644
+--- a/coregrind/m_libcfile.c
++++ b/coregrind/m_libcfile.c
+@@ -111,6 +111,14 @@ Bool VG_(resolve_filename) ( Int fd, const HChar** res=
+ult )
+ #     endif
+    }
+
++   struct vg_stat statbuf;
++   if (VG_(fstat)(fd, &statbuf) =3D=3D 0 && statbuf.nlink =3D=3D 0) {
++       buf =3D VG_(malloc)("resolve_filename", sizeof(tmp));
++       VG_(strcpy)(buf, tmp);
++       *result =3D buf;
++       return True;
++   }
++
+    while (42) {
+       SSizeT res =3D VG_(readlink)(tmp, buf, bufsiz);
+       if (res < 0) break;
+--=20
+2.47.0
+
+On Sat, Nov 16, 2024 at 6:39=E2=80=AFPM Dominik Banaszak <freenullptr@gmail=
+.com> wrote:
+>
+> Applies to Linux and Solaris.
+>
+> If the file referenced by the file descriptor passed to execveat(2) has
+> been deleted prior to the syscall or is an anonymous file created by
+> memfd_create(2), i.e. if the file has no hard links (st_nlinks =3D=3D 0),
+> the execveat wrapper would fail with errno set to ENOENT.
+>
+> The execveat wrapper uses VG_(resolve_filename) to retrieve an absolute
+> path to the file or directory pointed to by the dirfd argument. This
+> function uses readlink(2) to read the appropriate link in the procfs
+> directory /proc/self/fd. In the case of files with no hard links,
+> the output of readlink contains the suffix ' (deleted)', which leads to
+> execveat passing the incorrect path on to execve. Links in procfs to
+> files created with memfd_create additionally point to a bogus path in
+> the format '/memfd:NAME', where 'NAME' is determined by an argument to
+> the function.
+>
+> This commit changes VG_(resolve_filename) to execute a stat on the
+> procfs link and check if nlinks is equal to 0. If so, the procfs path is
+> returned and readlink is not called.
+>
+> https://bugs.kde.org/show_bug.cgi?id=3D379094
+> ---
+>  coregrind/m_libcfile.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+>
+> diff --git a/coregrind/m_libcfile.c b/coregrind/m_libcfile.c
+> index fb93b4867..2c72e3185 100644
+> --- a/coregrind/m_libcfile.c
+> +++ b/coregrind/m_libcfile.c
+> @@ -111,6 +111,14 @@ Bool VG_(resolve_filename) ( Int fd, const HChar** r=
+esult )
+>  #     endif
+>     }
+>
+> +   struct vg_stat statbuf;
+> +   if (VG_(fstat)(fd, &statbuf) =3D=3D 0 && statbuf.nlink =3D=3D 0) {
+> +       buf =3D VG_(malloc)("resolve_filename", sizeof(tmp));
+> +       VG_(strcpy)(buf, tmp);
+> +       *result =3D buf;
+> +       return True;
+> +   }
+> +
+>     while (42) {
+>        SSizeT res =3D VG_(readlink)(tmp, buf, bufsiz);
+>        if (res < 0) break;
+> --
+> 2.47.0

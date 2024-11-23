@@ -49,8 +49,6 @@ static void func_setbanner(gh_rpc * rpc, gh_rpcframe * frame) {
 
 static void * thread_callback(void * thread_voidp) {
     gh_thread * thread = (gh_thread *)thread_voidp;
-    gh_rpc_register(gh_thread_rpc(thread), "printbanner", func_printbanner);
-    gh_rpc_register(gh_thread_rpc(thread), "setbanner", func_setbanner);
 
     pthread_barrier_wait(&threads_barrier);
 
@@ -84,12 +82,19 @@ int main(void) {
 
     ghr_assert(gh_sandbox_ctor(&sandbox, options));
 
+
+    gh_rpc rpc;
+    ghr_assert(gh_rpc_ctor(&rpc, &alloc, gh_permprompter_simpletui(STDIN_FILENO)));
+
+    ghr_assert(gh_rpc_register(&rpc, "printbanner", func_printbanner));
+    ghr_assert(gh_rpc_register(&rpc, "setbanner", func_setbanner));
+
     for (size_t i = 0; i < THREADS_COUNT; i++) {
         char name[strlen("thread") + 2];
         snprintf(name, strlen("thread") + 2, "thread%d", (int)i);
         name[strlen("thread") + 1] = '\0';
 
-        ghr_assert(gh_sandbox_newthread(&sandbox, &alloc, name, name, threads + i));
+        ghr_assert(gh_sandbox_newthread(&sandbox, &rpc, name, name, threads + i));
         assert(pthread_create(pthreads + i, NULL, thread_callback, threads + i) == 0);
     }
 
@@ -101,6 +106,8 @@ int main(void) {
     for (size_t i = 0; i < THREADS_COUNT; i++) {
         gh_thread_dtor(threads + i);
     }
+
+    ghr_assert(gh_rpc_dtor(&rpc));
 
     ghr_assert(gh_sandbox_requestquit(&sandbox));
     
