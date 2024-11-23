@@ -43,7 +43,7 @@ jobs:
 
     - name: Build Valgrind (install)
       working-directory: ${{github.workspace}}/valgrind
-      run: make install
+      run: sudo make install
 
     - name: Retrieve submodules
       run: git submodule update --init --recursive
