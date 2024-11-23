@@ -27,7 +27,7 @@ jobs:
 
     - name: Apply patch for execveat fix
       working-directory: ${{github.workspace}}/valgrind
-      run: git am < ${{github.workspace}}/tools/valgrind-execveat-fix.mbox
+      run: env GIT_COMMITTER_NAME=ci GIT_COMMITTER_EMAIL=ci@example.org git am < ${{github.workspace}}/tools/valgrind-execveat-fix.mbox
 
     - name: Build Valgrind (autogen)
       working-directory: ${{github.workspace}}/valgrind
