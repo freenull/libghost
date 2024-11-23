@@ -179,7 +179,7 @@ gh_result gh_perms_readbuffer(gh_perms * perms, const char * buffer, size_t buff
     return perms_parse(perms, &parser, out_parsererror);
 }
 
-void gh_perms_write(gh_perms * perms, int fd) {
+gh_result gh_perms_write(gh_perms * perms, int fd) {
     gh_permwriter writer = gh_permwriter_new(fd);
-    gh_permfs_write(&perms->filesystem, &writer);
+    return gh_permfs_write(&perms->filesystem, &writer);
 }

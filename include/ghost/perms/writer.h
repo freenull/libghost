@@ -20,12 +20,12 @@ typedef struct {
 } gh_permwriter;
 
 gh_permwriter gh_permwriter_new(int fd);
-void gh_permwriter_beginresource(gh_permwriter * writer, const char * group, const char * resource);
-void gh_permwriter_endresource(gh_permwriter * writer);
-void gh_permwriter_beginentry(gh_permwriter * writer, const char * entry, size_t entry_len);
-void gh_permwriter_endentry(gh_permwriter * writer);
-void gh_permwriter_field(gh_permwriter * writer, const char * key);
-void gh_permwriter_fieldargident(gh_permwriter * writer, const char * value, size_t value_len);
-void gh_permwriter_fieldargstring(gh_permwriter * writer, const char * value, size_t value_len);
+gh_result gh_permwriter_beginresource(gh_permwriter * writer, const char * group, const char * resource);
+gh_result gh_permwriter_endresource(gh_permwriter * writer);
+gh_result gh_permwriter_beginentry(gh_permwriter * writer, const char * entry, size_t entry_len);
+gh_result gh_permwriter_endentry(gh_permwriter * writer);
+gh_result gh_permwriter_field(gh_permwriter * writer, const char * key);
+gh_result gh_permwriter_fieldargident(gh_permwriter * writer, const char * value, size_t value_len);
+gh_result gh_permwriter_fieldargstring(gh_permwriter * writer, const char * value, size_t value_len);
 
 #endif

@@ -30,6 +30,6 @@ gh_result gh_perms_dtor(gh_perms * perms);
 
 gh_result gh_perms_readfd(gh_perms * perms, int fd, gh_permparser_error * out_parsererror);
 gh_result gh_perms_readbuffer(gh_perms * perms, const char * buffer, size_t buffer_len, gh_permparser_error * out_parsererror);
-void gh_perms_write(gh_perms * perms, int fd);
+gh_result gh_perms_write(gh_perms * perms, int fd);
 
 #endif

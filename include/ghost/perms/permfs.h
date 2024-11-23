@@ -88,6 +88,6 @@ gh_result gh_permfs_reqdtor(gh_permfs * permfs, gh_permfs_reqdata * reqdata);
 gh_result gh_permfs_dtor(gh_permfs * permfs);
 gh_result gh_permfs_fcntlflags2permfsmode(int fcntl_flags, gh_permfs_mode * out_mode);
 gh_result gh_permfs_registerparser(gh_permfs * permfs, gh_permparser * parser);
-void gh_permfs_write(gh_permfs * permfs, gh_permwriter * writer);
+gh_result gh_permfs_write(gh_permfs * permfs, gh_permwriter * writer);
 
 #endif

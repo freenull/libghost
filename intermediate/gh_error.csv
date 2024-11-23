@@ -185,4 +185,7 @@ PERMPARSER_EXPECTEDSTRING,,Expected string
 PERMPARSER_EXPECTEDIDENTIFIER,,Expected identifier
 PERMPARSER_RESOURCEPARSEFAIL,,Failed parsing resource
 
+PERMWRITER_WRITEFAILED,,Failed writing permission file to file descriptor
+PERMWRITER_WRITETRUNCATED,,Permission file output to file descriptor was truncated
+
 UNKNOWN,,Unknown error

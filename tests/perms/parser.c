@@ -98,7 +98,7 @@ int main(void) {
     // (all of the rules should be the same, with the exception of a new /tmp/foobar.txt entry
     //  with self reject on CREATEFILE)
     int outputfd = memfd_create("output", 0);
-    gh_perms_write(&perms, outputfd);
+    ghr_assert(gh_perms_write(&perms, outputfd));
     assert(lseek(outputfd, 0, SEEK_SET) >= 0);
     char output_buf[4096] = {0};
     assert(read(outputfd, output_buf, sizeof(output_buf)) >= 0);

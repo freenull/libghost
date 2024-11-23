@@ -454,37 +454,62 @@ gh_result gh_permfs_registerparser(gh_permfs * permfs, gh_permparser * parser) {
     });
 }
 
-static void permfs_writemode(gh_permfs * permfs, gh_permwriter * writer, const char * modeset_name, const char * mode_name, gh_permfs_mode mode) {
-    if (mode == 0) return;
+static gh_result permfs_writemode(gh_permfs * permfs, gh_permwriter * writer, const char * modeset_name, const char * mode_name, gh_permfs_mode mode) {
+    gh_result res = GHR_OK;
+
+    if (mode == 0) return res;
 
     (void)permfs;
 
-    gh_permwriter_field(writer, modeset_name);
-    gh_permwriter_fieldargident(writer, mode_name, strlen(mode_name));
+    res = gh_permwriter_field(writer, modeset_name);
+    if (ghr_iserr(res)) return res;
+
+    res = gh_permwriter_fieldargident(writer, mode_name, strlen(mode_name));
+    if (ghr_iserr(res)) return res;
 
     gh_permfs_mode iter = mode;
     gh_permfs_mode flag;
     while (gh_permfs_nextmodeflag(&iter, &flag)) {
         const char * flag_str = gh_permfs_strmodeflag(flag);
-        gh_permwriter_fieldargstring(writer, flag_str, strlen(flag_str));
+        res = gh_permwriter_fieldargstring(writer, flag_str, strlen(flag_str));
+        if (ghr_iserr(res)) return res;
     }
+
+    return res;
 }
 
-static void permfs_writemodeset(gh_permfs * permfs, gh_permwriter * writer, const char * modeset_name, gh_permfs_modeset modeset) {
-    permfs_writemode(permfs, writer, modeset_name, "accept", modeset.mode_accept);
-    permfs_writemode(permfs, writer, modeset_name, "reject", modeset.mode_reject);
-    permfs_writemode(permfs, writer, modeset_name, "prompt", modeset.mode_prompt);
+static gh_result permfs_writemodeset(gh_permfs * permfs, gh_permwriter * writer, const char * modeset_name, gh_permfs_modeset modeset) {
+    gh_result res = GHR_OK;
+    res = permfs_writemode(permfs, writer, modeset_name, "accept", modeset.mode_accept);
+    if (ghr_iserr(res)) return res;
+
+    res = permfs_writemode(permfs, writer, modeset_name, "reject", modeset.mode_reject);
+    if (ghr_iserr(res)) return res;
+
+    res = permfs_writemode(permfs, writer, modeset_name, "prompt", modeset.mode_prompt);
+    if (ghr_iserr(res)) return res;
+
+    return res;
 }
 
-void gh_permfs_write(gh_permfs * permfs, gh_permwriter * writer) {
-    gh_permwriter_beginresource(writer, "filesystem", "node");
+gh_result gh_permfs_write(gh_permfs * permfs, gh_permwriter * writer) {
+    gh_result res = GHR_OK;
+    res = gh_permwriter_beginresource(writer, "filesystem", "node");
+    if (ghr_iserr(res)) return res;
 
     for (size_t i = 0; i < permfs->file_perms.size; i++) {
         gh_permfs_entry * entry = permfs->file_perms.buffer + i;
-        gh_permwriter_beginentry(writer, entry->ident.path.ptr, entry->ident.path.len);
-        permfs_writemodeset(permfs, writer, "self", entry->self);
-        permfs_writemodeset(permfs, writer, "children", entry->children);
-        gh_permwriter_endentry(writer);
+        res = gh_permwriter_beginentry(writer, entry->ident.path.ptr, entry->ident.path.len);
+        if (ghr_iserr(res)) return res;
+
+        res = permfs_writemodeset(permfs, writer, "self", entry->self);
+        if (ghr_iserr(res)) return res;
+
+        res = permfs_writemodeset(permfs, writer, "children", entry->children);
+        if (ghr_iserr(res)) return res;
+
+        res = gh_permwriter_endentry(writer);
+        if (ghr_iserr(res)) return res;
     }
-    gh_permwriter_endresource(writer);
+    return gh_permwriter_endresource(writer);
 }
