@@ -44,6 +44,8 @@ struct gh_thread {
     pid_t pid;
     gh_ipc ipc;
     gh_rpc * rpc;
+    gh_perms perms;
+    int default_timeout_ms;
     void * userdata;
 };
 
@@ -54,12 +56,10 @@ typedef struct gh_thread gh_thread;
 
 #define GH_THREAD_LUAINFO_TIMEOUTMS 1000
 
-gh_result gh_sandbox_newthread(gh_sandbox * sandbox, gh_rpc * rpc, const char * name, const char * safe_id, gh_thread * out_thread);
-gh_result gh_thread_dtor(gh_thread * thread);
+gh_result gh_sandbox_newthread(gh_sandbox * sandbox, gh_rpc * rpc, const char * name, const char * safe_id, int default_timeout_ms, gh_thread * out_thread);
+gh_result gh_thread_dtor(gh_thread * thread, gh_result * out_subjailresult);
 gh_result gh_thread_attachuserdata(gh_thread * thread, void * userdata);
 gh_result gh_thread_process(gh_thread * thread, gh_threadnotif * notif);
-gh_result gh_thread_requestquit(gh_thread * thread);
-gh_result gh_thread_forcekill(gh_thread * thread);
 gh_rpc * gh_thread_rpc(gh_thread * thread);
 
 gh_result gh_thread_runstring(gh_thread * thread, const char * s, size_t s_len, int * script_id);

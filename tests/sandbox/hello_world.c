@@ -41,10 +41,10 @@ int main(void) {
 
     gh_rpc rpc;
     ghr_assert(gh_rpc_ctor(&rpc, &alloc, gh_permprompter_simpletui(STDIN_FILENO)));
-    ghr_assert(gh_rpc_register(&rpc, "print", func_print));
+    ghr_assert(gh_rpc_register(&rpc, "print", func_print, GH_RPCFUNCTION_THREADSAFE));
 
     gh_thread thread;
-    ghr_assert(gh_sandbox_newthread(&sandbox, &rpc, "thread", "thread", &thread));
+    ghr_assert(gh_sandbox_newthread(&sandbox, &rpc, "thread", "thread", GH_IPC_NOTIMEOUT, &thread));
 
     char s[] =
         "local ghost = require('ghost')\n"
@@ -65,15 +65,11 @@ int main(void) {
             break;
         }
     }
-    ghr_assert(gh_thread_requestquit(&thread));
-    ghr_assert(gh_thread_dtor(&thread));
+    ghr_assert(gh_thread_dtor(&thread, NULL));
 
     ghr_assert(gh_rpc_dtor(&rpc));
 
-    ghr_assert(gh_sandbox_requestquit(&sandbox));
-    
-    ghr_assert(gh_sandbox_wait(&sandbox));
-    ghr_assert(gh_sandbox_dtor(&sandbox));
+    ghr_assert(gh_sandbox_dtor(&sandbox, NULL));
 
     return 0;
 }

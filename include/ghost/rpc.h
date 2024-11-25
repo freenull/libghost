@@ -36,9 +36,18 @@ typedef struct gh_rpc gh_rpc;
 
 typedef void gh_rpcfunction_func(gh_rpc * rpc, gh_rpcframe * frame);
 
+typedef enum {
+    GH_RPCFUNCTION_THREADUNSAFELOCAL,
+    GH_RPCFUNCTION_THREADUNSAFEGLOBAL,
+    GH_RPCFUNCTION_THREADSAFE
+} gh_rpcfunction_threadsafety;
+
 #define GH_RPCFUNCTION_MAXNAME GH_IPCMSG_FUNCTIONCALL_MAXNAME
 
 struct gh_rpcfunction {
+    gh_rpcfunction_threadsafety thread_safety;
+    pthread_mutex_t mutex;
+
     char name[GH_RPCFUNCTION_MAXNAME];
     gh_rpcfunction_func * func;
 };
@@ -50,10 +59,10 @@ struct gh_rpc {
     gh_alloc * alloc;
     gh_rpcfunction * buffer;
     gh_permprompter prompter;
-    gh_perms perms;
     size_t size;
     size_t capacity;
     _Atomic ssize_t thread_refcount;
+    pthread_mutex_t global_mutex;
 };
 
 __attribute__((always_inline))
@@ -73,7 +82,7 @@ static inline bool gh_rpc_isinuse(gh_rpc * rpc) {
 
 gh_result gh_rpc_ctor(gh_rpc * rpc, gh_alloc * alloc, gh_permprompter prompter);
 gh_result gh_rpc_dtor(gh_rpc * rpc);
-gh_result gh_rpc_register(gh_rpc * rpc, const char * name, gh_rpcfunction_func * func);
+gh_result gh_rpc_register(gh_rpc * rpc, const char * name, gh_rpcfunction_func * func, gh_rpcfunction_threadsafety thread_safety);
 gh_result gh_rpc_newframe(gh_rpc * rpc, const char * name, gh_thread * thread, size_t arg_count, gh_rpcarg * args, gh_rpcarg return_arg, gh_rpcframe * out_frame);
 gh_result gh_rpc_newframefrommsg(gh_rpc * rpc, gh_thread * thread, gh_ipcmsg_functioncall * msg, gh_rpcframe * out_frame);
 gh_result gh_rpc_callframe(gh_rpc * rpc, gh_rpcframe * frame);

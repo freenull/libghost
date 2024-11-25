@@ -88,6 +88,10 @@ int main(int argc, char ** argv) {
         return 1;
     }
 
+    if (signal(SIGCHLD, SIG_IGN) == SIG_ERR) {
+        ghr_fail(GHR_JAIL_SIGCHLD);
+    }
+
     fprintf(stderr, "jail: started with pid %d\n", getpid());
     fprintf(stderr, "jail: sandbox options fd is %s\n", argv[1]);
 
@@ -143,7 +147,7 @@ int main(int argc, char ** argv) {
         if (message_recv(&ipc, msg)) break;
     }
 
-    fprintf(stderr, "jail: stopping normally\n");
+    fprintf(stderr, "jail: stopping gracefully\n");
 
     return 0;
 }
@@ -174,6 +178,9 @@ gh_result gh_jail_lockdown(gh_sandboxoptions * options) {
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, F_GETFL, 0, 1),
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW),
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_KILL_PROCESS),
+
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_fsync, 29, 0),
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_lseek, 28, 0),
 
         // allow installing additional seccomp filters
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_seccomp, 27, 0),

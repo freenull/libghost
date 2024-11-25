@@ -11,7 +11,6 @@ typedef enum {
     GH_PERMRESPONSE_REJECT,
     GH_PERMRESPONSE_ACCEPTREMEMBER,
     GH_PERMRESPONSE_REJECTREMEMBER,
-    GH_PERMRESPONSE_EMERGENCYKILL
 } gh_permresponse;
 
 typedef gh_result gh_permprompter_func(const gh_permrequest * req, void * userdata, gh_permresponse * out_response);

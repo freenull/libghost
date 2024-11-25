@@ -12,7 +12,7 @@
 
 gh_result gh_ipc_ctor(gh_ipc * ipc, int * out_peerfd) {
     int fds[2];
-    int socketpair_res = socketpair(AF_UNIX, SOCK_DGRAM, 0, fds);
+    int socketpair_res = socketpair(AF_UNIX, SOCK_SEQPACKET, 0, fds);
     if (socketpair_res < 0) {
         return ghr_errno(GHR_IPC_SOCKCREATEFAIL);
     }
@@ -117,6 +117,7 @@ gh_result gh_ipc_send(gh_ipc * ipc, gh_ipcmsg * msg, size_t msg_size) {
 
     ssize_t sendmsg_res = sendmsg(ipc->sockfd, &msgh, 0);
     if (sendmsg_res < 0) {
+        if (errno == EPIPE) return ghr_errno(GHR_IPC_PEERSHUTDOWN);
         return ghr_errno(GHR_IPC_SENDMSGFAIL);
     }
 
@@ -185,6 +186,7 @@ gh_result gh_ipc_recv(gh_ipc * ipc, gh_ipcmsg * msg, int timeout_ms) {
 
     ssize_t recv_size = recvmsg(ipc->sockfd, &msgh, 0);
     if (recv_size < 0) return ghr_errno(GHR_IPC_RECVMSGFAIL);
+    if (recv_size == 0) return ghr_errno(GHR_IPC_PEERSHUTDOWN);
 
     bool msg_trunc = (msgh.msg_flags & MSG_TRUNC) != 0;
     if (msg_trunc) return GHR_IPC_RECVMSGTRUNC;
@@ -199,7 +201,7 @@ gh_result gh_ipc_recv(gh_ipc * ipc, gh_ipcmsg * msg, int timeout_ms) {
     return GHR_OK;
 }
 
-gh_result gh_ipc_call(gh_ipc * ipc, const char * name, size_t argc, gh_ipcmsg_functioncall_arg * args, void * return_arg, size_t return_arg_size) {
+gh_result gh_ipc_call(gh_ipc * ipc, const char * name, size_t argc, gh_ipcmsg_functioncall_arg * args, int * return_fd, void * return_arg, size_t return_arg_size) {
     gh_ipcmsg_functioncall funccall = {0};
     funccall.type = GH_IPCMSG_FUNCTIONCALL;
     strncpy(funccall.name, name, GH_IPCMSG_FUNCTIONCALL_MAXNAME - 1);
@@ -229,8 +231,10 @@ gh_result gh_ipc_call(gh_ipc * ipc, const char * name, size_t argc, gh_ipcmsg_fu
     }
 
     gh_ipcmsg_functionreturn * return_msg = (gh_ipcmsg_functionreturn *)msg;
-    if (return_msg->fd >= 0 && funccall.return_arg.size >= sizeof(int) && funccall.return_arg.addr != (uintptr_t)NULL) {
-        memcpy((void*)funccall.return_arg.addr, &return_msg->fd, sizeof(int));
+    if (return_msg->fd >= 0 && return_fd != NULL) {
+        *return_fd = return_msg->fd;
+    } else if (return_fd != NULL) {
+        *return_fd = -1;
     }
 
     return return_msg->result;

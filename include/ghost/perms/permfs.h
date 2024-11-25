@@ -10,7 +10,11 @@
 #include <ghost/perms/writer.h>
 
 bool gh_permfs_nextmodeflag(gh_permfs_mode * state, gh_permfs_mode * out_flag);
-const char * gh_permfs_strmodeflag(gh_permfs_mode flag);
+
+__attribute__((always_inline))
+static inline bool gh_permfs_mode_isaccessmodeflag(gh_permfs_mode flag) {
+    return flag >= GH_PERMFS_ACCESS_USER_READ && flag <= GH_PERMFS_ACCESS_OTHER_EXECUTE;
+}
 
 typedef struct {
     gh_bytebuffer buffer;
@@ -83,10 +87,10 @@ gh_result gh_permfs_getmode(gh_permfs * permfs, int opath_fd, gh_abscanonicalpat
 gh_result gh_permfs_act(gh_permfs * permfs, gh_permfs_modeset modeset, gh_permfs_mode mode, gh_permfs_actionresult * out_result);
 gh_result gh_permfs_actfd(gh_permfs * permfs, gh_permprompter * prompter, gh_pathfd fd, gh_permfs_mode mode, gh_permfs_actionresult * out_actionresult);
 gh_result gh_permfs_actpath(gh_permfs * permfs, int dirfd, const char * path, gh_permfs_mode mode, gh_permfs_actionresult * out_actionresult, int * out_safefd);
-gh_result gh_permfs_reqctor(gh_permfs * permfs, const char * source, gh_abscanonicalpath path, gh_permfs_actionresult * result, gh_permfs_reqdata * out_reqdata);
+gh_result gh_permfs_reqctor(gh_permfs * permfs, const char * source, gh_abscanonicalpath path, const char * hint, gh_permfs_actionresult * result, gh_permfs_reqdata * out_reqdata);
 gh_result gh_permfs_reqdtor(gh_permfs * permfs, gh_permfs_reqdata * reqdata);
 gh_result gh_permfs_dtor(gh_permfs * permfs);
-gh_result gh_permfs_fcntlflags2permfsmode(int fcntl_flags, gh_permfs_mode * out_mode);
+gh_result gh_permfs_fcntlflags2permfsmode(int fcntl_flags, mode_t create_accessmode, gh_pathfd pathfd, gh_permfs_mode * out_mode);
 gh_result gh_permfs_registerparser(gh_permfs * permfs, gh_permparser * parser);
 gh_result gh_permfs_write(gh_permfs * permfs, gh_permwriter * writer);
 

@@ -24,8 +24,7 @@ typedef struct {
 } gh_perms;
 
 gh_result gh_perms_ctor(gh_perms * perms, gh_alloc * alloc);
-gh_result gh_perms_actfilesystem(gh_perms * perms, gh_thread * thread, gh_pathfd fd, gh_permfs_mode mode);
-gh_result gh_perms_openat(gh_perms * perms, gh_thread * thread, int dirfd, const char * path, int flags, mode_t create_mode, int * out_fd);
+gh_result gh_perms_actfilesystem(gh_thread * thread, gh_pathfd fd, gh_permfs_mode mode, const char * hint);
 gh_result gh_perms_dtor(gh_perms * perms);
 
 gh_result gh_perms_readfd(gh_perms * perms, int fd, gh_permparser_error * out_parsererror);

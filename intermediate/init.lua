@@ -25,6 +25,7 @@ ffi.cdef[[
         const char * name,
         size_t arg_count,
         gh_ipcmsg_functioncall_arg * args,
+        int * return_fd,
         void * return_arg,
         size_t return_arg_size
     );
@@ -77,6 +78,9 @@ end
 
 local function arg_obj(value, args, i)
     local t = type(value)
+    if t == "cdata" then
+        t = tostring(ffi.typeof(value))
+    end
 
     if t == "string" then
         args[i].addr = ffi.cast("uintptr_t", value)
@@ -95,14 +99,14 @@ local function arg_obj(value, args, i)
         args[i].size = ffi.sizeof("bool")
         return obj
     -- custom
-    elseif t == "int" then
+    elseif t == "int" or t == "ctype<int>" then
         local obj = ffi.new("int[1]")
         obj[0] = value
         args[i].addr = ffi.cast("uintptr_t", obj)
         args[i].size = ffi.sizeof("int")
         return obj
     else
-        error("can't convert return type to lua type: " .. tostring(t))
+        error("can't convert parameter type to lua type: " .. tostring(t))
     end
 end
 
@@ -140,21 +144,23 @@ function ghost.call(name, ret_type, ...)
         end
     end
 
-    local result = ffi.C.gh_ipc_call(IPC, name, arg_count, args, ret_obj, ret_size)
+    local fd_ret = ffi.new("int[1]")
+
+    local result = ffi.C.gh_ipc_call(IPC, name, arg_count, args, fd_ret, ret_obj, ret_size)
     handle_ghr(result)
 
     if ret_obj ~= nil then
-        return retbuffer_read(ret_obj, ret_type)
+        local ret_value = retbuffer_read(ret_obj, ret_type)
+        if fd_ret[0] ~= -1 then
+            return ret_value, fd_ret[0]
+        else
+            return ret_value
+        end
+    elseif fd_ret[0] ~= -1 then
+        return fd_ret[0]
     end
 
     return nil
 end
 
-local io = require("io")
-local debug = require("debug")
-local io_meta = debug.getmetatable(io.stdout)
-function ghost.fdopen(fd, mode)
-    local ud = c_support.fdopen(fd, mode);
-    debug.setmetatable(ud, io_meta)
-    return ud
-end
+ghost._udptr = c_support.udptr

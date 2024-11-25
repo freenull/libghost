@@ -78,7 +78,7 @@ set(enum_permfs_mode_out ${enum_permfs_mode_out_header} ${enum_permfs_mode_out_s
 
 add_custom_command(
     OUTPUT ${enum_permfs_mode_out}
-    COMMAND ${PROJECT_SOURCE_DIR}/tools/enumgen.py -p GH_PERMFS_ -c "${PROJECT_SOURCE_DIR}/intermediate/gh_permfs_mode.csv" -H ${enum_permfs_mode_out_header} -S ${enum_permfs_mode_out_source} -n gh_permfs_mode
+    COMMAND ${PROJECT_SOURCE_DIR}/tools/enumgen.py -i -u NONE -p GH_PERMFS_ -c "${PROJECT_SOURCE_DIR}/intermediate/gh_permfs_mode.csv" -H ${enum_permfs_mode_out_header} -S ${enum_permfs_mode_out_source} -n gh_permfs_mode
     DEPENDS ${enum_permfs_mode_src}
 )
 add_custom_target(ghost-enum-permfs_mode DEPENDS ${enum_permfs_mode_out})
@@ -138,6 +138,13 @@ add_custom_command(
 )
 add_custom_target(ghost-jail-luainit DEPENDS "${PROJECT_BINARY_DIR}/lua_init.c")
 
+add_custom_command(
+    OUTPUT "${PROJECT_BINARY_DIR}/lua_stdlib.c"
+    COMMAND "${cembed}" "${PROJECT_SOURCE_DIR}/intermediate/stdlib.lua" -e -n gh_luastdlib_script_data -o "${PROJECT_BINARY_DIR}/lua_stdlib.c"
+    DEPENDS "${PROJECT_SOURCE_DIR}/intermediate/stdlib.lua" ${cembed}
+)
+add_custom_target(ghost-jail-luastdlib DEPENDS "${PROJECT_SOURCE_DIR}/intermediate/stdlib.lua" ${cembed} "${PROJECT_BINARY_DIR}/lua_stdlib.c")
+
 set(luajit_include "${CMAKE_BINARY_DIR}/luajit/usr/local/include")
 add_library(libluajit STATIC IMPORTED)
 add_dependencies(libluajit luajit)
@@ -145,10 +152,11 @@ set_target_properties(libluajit PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR
 
 list(APPEND ghost_src ${enum_error_out_source})
 list(APPEND ghost_src "${PROJECT_BINARY_DIR}/lua_init.c")
+list(APPEND ghost_src "${PROJECT_BINARY_DIR}/lua_stdlib.c")
 list(APPEND ghost_inc ${enum_error_out_header})
 
 add_library(libghost-nojail SHARED "${ghost_src}")
-add_dependencies(libghost-nojail ghost-enum-error ghost-enum-permfs_mode ghost-jail-luainit)
+add_dependencies(libghost-nojail ghost-enum-error ghost-enum-permfs_mode ghost-jail-luainit ghost-jail-luastdlib)
 set_target_properties(libghost-nojail PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(libghost-nojail PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 set_target_properties(libghost-nojail PROPERTIES OUTPUT_NAME "ghost")
@@ -205,7 +213,7 @@ add_library(
     ${ghost_src} ${ghost_embedded_jail_src}
 )
 
-add_dependencies(libghost ghost-enum-error ghost-enum-permfs_mode ghost-embedded-jail ghost-jail ghost-jail-luainit)
+add_dependencies(libghost ghost-enum-error ghost-enum-permfs_mode ghost-embedded-jail ghost-jail ghost-jail-luainit ghost-jail-luastdlib)
 set_target_properties(libghost PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(libghost PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 set_target_properties(libghost PROPERTIES OUTPUT_NAME "ghost")

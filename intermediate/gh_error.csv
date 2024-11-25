@@ -32,7 +32,12 @@ SANDBOX_CLOSESOCKFAIL,,Failed closing one end of the IPC socket while initializi
 SANDBOX_THREADCLOSESOCKFAIL,,Failed closing one end of the IPC socket while initializing thread
 SANDBOX_EXPECTEDSUBJAILALIVE,,Expected to receive SUBJAILALIVE message, but subjail sent a different message
 SANDBOX_THREADRECOVERYKILLFAIL,,Failed killing subjail process as part of recovery process from another error
+SANDBOX_PIDFD,,Failed creating pidfd for sandbox process
+SANDBOX_PIDFDPOLL,,Failed polling sandbox process
+SANDBOX_PIDFDKILL,,Failed forcefully killing sandbox process after timing out waiting for it to finish
+SANDBOX_PIDFDWAIT,,Failed reaping sandbox jail process
 SANDBOX_KILLFAIL,,Failed forcefully killing sandbox
+SANDBOX_FORCEKILL,,Sandbox jail process did not shut down in time and was forcefully killed
 
 THREAD_LONGSAFEID,,Safe ID is too long and as opposed to the name, the safe ID may not be truncated
 THREAD_KILLFAIL,,Failed forcefully killing thread
@@ -40,7 +45,11 @@ THREAD_UNKNOWNMESSAGE,,Received unknown message from thread
 THREAD_UNEXPECTEDMESSAGE,,Received unexpected message from thread
 THREAD_LARGESTRING,,Lua script passed as string is too large to send - consider using a memfd
 THREAD_LUAFAIL,,Lua script failed with an error according to subjail process
+THREAD_FORCEKILL,,Thread subjail process did not shut down in time and was forcefully killed
+THREAD_DESTROYED,,Cannot operate on destroyed thread
+THREAD_WAITCLOCK,,"Couldn't access monotonic clock, which means subjail couldn't be given an opportunity to use RPC functions in destructors and may have crashed"
 
+JAIL_SIGCHLD,,Failed installing SIGCHLD signal handler in jail process
 JAIL_OPTIONSMEMFAIL,,Failed creating memory file containing sandbox options
 JAIL_OPTIONSWRITEFAIL,,Failed writing to memory file containing sandbox options
 JAIL_OPTIONSSWRITETRUNC,,Failed writing to memory file containing sandbox options - file was truncated
@@ -74,6 +83,7 @@ IPC_SENDMSGFAIL,,Failed sending message over IPC socket
 IPC_POLLMSGFAIL,,Failed polling for message in IPC socket
 IPC_RECVMSGTIMEOUT,,Timed out waiting to receive message over IPC socket
 IPC_RECVMSGFAIL,,Failed receiving message over IPC socket
+IPC_PEERSHUTDOWN,,IPC peer shut down unexpectedly
 IPC_RECVMSGTRUNC,,Message received over IPC socket was too long
 IPC_RECVTOOSMALL,,Message received over IPC socket was impossibly small
 IPC_NOCONTROLDATA,,IPC message should have container control header, but doesn't
@@ -109,6 +119,14 @@ RPC_RETURNCOPYFAIL,,Failed writing return value into subjail memory
 RPC_FRAMEDISPOSED,,Cannot call disposed frame
 RPC_RETURNSIZE,,Reserved return value memory is too small for return value
 RPC_CLOSEFD,,Failed closing file descriptor returned to subjail from call frame
+RPC_MUTEXINIT,,Failed initializing mutex for thread unsafe function
+RPC_MUTEXDESTROY,,Failed destroying mutex for thread unsafe function
+RPC_MUTEXLOCK,,Failed locking mutex for thread unsafe function
+RPC_MUTEXUNLOCK,,Failed unlocking mutex for thread unsafe function
+RPC_GLOBALMUTEXINIT,,Failed initializing global mutex
+RPC_GLOBALMUTEXDESTROY,,Failed destroying global mutex
+RPC_GLOBALMUTEXLOCK,,Failed locking global mutex for thread unsafe function
+RPC_GLOBALMUTEXUNLOCK,,Failed unlocking global mutex for thread unsafe function
 
 RPCF_ARG0,,Invalid argument #1
 RPCF_ARG1,,Invalid argument #2
@@ -148,11 +166,11 @@ PERMFS_BADFCNTLMODE,,Provided open(2)-like mode is not supported
 PERMFS_FAILOPEN,,Failed opening file
 PERMFS_PATHFDOPENFAIL,,Failed opening path fd
 PERMFS_PATHFDCLOSEFAIL,,Failed closing path fd
+PERMFS_UNKNOWNMODE,,Unknown permfs mode flag
 
 PERMS_REJECTEDPOLICY,,Permission to resource denied by existing security policy
 PERMS_REJECTEDUSER,,Permission to resource denied by user
 PERMS_REJECTEDPROMPT,,"Permission to resource denied, user should be prompted to change security policy"
-PERMS_REJECTEDKILL,,Permission to resource denied and source must be terminated immediately
 
 PERMPROMPT_UNSUPPORTEDGROUP,,Prompter does not support this permission group
 PERMPROMPT_UNSUPPORTEDRESOURCE,,Prompter does not support this permission resource
@@ -187,5 +205,12 @@ PERMPARSER_RESOURCEPARSEFAIL,,Failed parsing resource
 
 PERMWRITER_WRITEFAILED,,Failed writing permission file to file descriptor
 PERMWRITER_WRITETRUNCATED,,Permission file output to file descriptor was truncated
+
+STD_OPENTMP,,Failed opening temporary directory
+STD_CLOSETMP,,Failed closing file descriptor for temporary directory
+STD_OPENTMPFILE,,Failed opening temporary file
+STD_CLOSETMPFILE,,Failed closing temporary file
+STD_NOENT,,File doesn't exist
+STD_UNLINK,,Failed unlinking filesystem node
 
 UNKNOWN,,Unknown error

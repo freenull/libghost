@@ -2,6 +2,7 @@
 #include <string.h>
 #include <sys/uio.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <stdatomic.h>
 #include <ghost/result.h>
 #include <ghost/thread.h>
@@ -9,14 +10,26 @@
 #include <ghost/rpc.h>
 #include <ghost/alloc.h>
 #include <ghost/dynamic_array.h>
-#include <ghost/perms/perms.h>
+
+static gh_result rpc_dtorelement_func(gh_dynamicarray da, void * elem, void * userdata) {
+    (void)da;
+    (void)userdata;
+
+    gh_rpcfunction * func = (gh_rpcfunction *)elem;
+
+    if (func->thread_safety == GH_RPCFUNCTION_THREADUNSAFELOCAL) {
+        int pthread_res = pthread_mutex_destroy(&func->mutex);
+        if (pthread_res != 0) return ghr_errnoval(GHR_RPC_MUTEXDESTROY, pthread_res);
+    }
+    return GHR_OK;
+}
 
 static const gh_dynamicarrayoptions rpc_daopts = {
     .initial_capacity = GH_RPC_INITIALCAPACITY,
     .max_capacity = GH_RPCFUNCTION_MAXNAME,
     .element_size = sizeof(gh_rpcfunction),
    
-    .dtorelement_func = NULL,
+    .dtorelement_func = rpc_dtorelement_func,
     .userdata = NULL
 };
 
@@ -25,20 +38,20 @@ gh_result gh_rpc_ctor(gh_rpc * rpc, gh_alloc * alloc, gh_permprompter prompter) 
     rpc->prompter = prompter;
     atomic_store(&rpc->thread_refcount, 0);
 
-    gh_result res = gh_perms_ctor(&rpc->perms, alloc);
-    if (ghr_iserr(res)) return res;
+    int pthread_res = pthread_mutex_init(&rpc->global_mutex, NULL);
+    if (pthread_res != 0) return ghr_errnoval(GHR_RPC_GLOBALMUTEXINIT, pthread_res);
 
     return gh_dynamicarray_ctor(GH_DYNAMICARRAY(rpc), &rpc_daopts);
 }
 
 gh_result gh_rpc_dtor(gh_rpc * rpc) {
-    gh_result res = gh_perms_dtor(&rpc->perms);
-    if (ghr_iserr(res)) return res;
+    int pthread_res = pthread_mutex_destroy(&rpc->global_mutex);
+    if (pthread_res != 0) return ghr_errnoval(GHR_RPC_GLOBALMUTEXDESTROY, pthread_res);
 
     return gh_dynamicarray_dtor(GH_DYNAMICARRAY(rpc), &rpc_daopts);
 }
 
-gh_result gh_rpc_register(gh_rpc * rpc, const char * name, gh_rpcfunction_func * func) {
+gh_result gh_rpc_register(gh_rpc * rpc, const char * name, gh_rpcfunction_func * func, gh_rpcfunction_threadsafety thread_safety) {
     if (gh_rpc_isinuse(rpc)) return GHR_RPC_INUSE;
 
     gh_rpcfunction function = {0};
@@ -46,8 +59,18 @@ gh_result gh_rpc_register(gh_rpc * rpc, const char * name, gh_rpcfunction_func *
     function.name[GH_RPCFUNCTION_MAXNAME - 1] = '\0';
     function.func = func;
 
-    gh_result r =  gh_dynamicarray_append(GH_DYNAMICARRAY(rpc), &rpc_daopts, &function);
-    return r;
+    function.thread_safety = thread_safety;
+
+    gh_result res = gh_dynamicarray_append(GH_DYNAMICARRAY(rpc), &rpc_daopts, &function);
+    if (ghr_iserr(res)) return res;
+
+    if (thread_safety == GH_RPCFUNCTION_THREADUNSAFELOCAL) {
+        gh_rpcfunction * function_entry = rpc->buffer + (rpc->size - 1);
+        int pthread_res = pthread_mutex_init(&function_entry->mutex, NULL);
+        if (pthread_res != 0) return ghr_errnoval(GHR_RPC_MUTEXINIT, pthread_res);
+    }
+
+    return GHR_OK;
 }
 
 gh_result gh_rpc_newframe(gh_rpc * rpc, const char * name, gh_thread * thread, size_t arg_count, gh_rpcarg * args, gh_rpcarg return_arg, gh_rpcframe * out_frame) {
@@ -174,8 +197,24 @@ gh_result gh_rpc_callframe(gh_rpc * rpc, gh_rpcframe * frame) {
         memset(frame->return_arg.ptr, 0, frame->return_arg.size);
     }
 
+    if (frame->function->thread_safety == GH_RPCFUNCTION_THREADUNSAFELOCAL) {
+        int pthread_res = pthread_mutex_lock(&frame->function->mutex);
+        if (pthread_res != 0) return ghr_errnoval(GHR_RPC_MUTEXLOCK, pthread_res);
+    } else if (frame->function->thread_safety == GH_RPCFUNCTION_THREADUNSAFEGLOBAL) {
+        int pthread_res = pthread_mutex_lock(&rpc->global_mutex);
+        if (pthread_res != 0) return ghr_errnoval(GHR_RPC_GLOBALMUTEXLOCK, pthread_res);
+    }
+
     frame->result = GHR_OK;
     frame->function->func(rpc, frame);
+
+    if (frame->function->thread_safety == GH_RPCFUNCTION_THREADUNSAFELOCAL) {
+        int pthread_res = pthread_mutex_unlock(&frame->function->mutex);
+        if (pthread_res != 0) return ghr_errnoval(GHR_RPC_MUTEXUNLOCK, pthread_res);
+    } else if (frame->function->thread_safety == GH_RPCFUNCTION_THREADUNSAFEGLOBAL) {
+        int pthread_res = pthread_mutex_unlock(&rpc->global_mutex);
+        if (pthread_res != 0) return ghr_errnoval(GHR_RPC_GLOBALMUTEXUNLOCK, pthread_res);
+    }
 
     return GHR_OK;
 }
@@ -186,7 +225,7 @@ gh_result gh_rpc_respondtomsg(gh_rpc * rpc, gh_ipcmsg_functioncall * funccall_ms
     if (frame->function == NULL) return GHR_RPC_FRAMEDISPOSED;
     if (frame->result == GHR_RPC_UNEXECUTED) return GHR_RPC_UNEXECUTED;
 
-    if (ghr_isok(frame->result) && frame->fd < 0 && frame->return_arg.size != 0 && frame->return_arg.ptr != NULL) {
+    if (ghr_isok(frame->result) && frame->return_arg.size != 0 && frame->return_arg.ptr != NULL) {
         struct iovec local_iovec = { .iov_base = frame->return_arg.ptr, .iov_len = frame->return_arg.size };
         struct iovec remote_iovec = { .iov_base = (void*)funccall_msg->return_arg.addr, .iov_len = frame->return_arg.size };
         ssize_t writev_res = process_vm_writev(frame->thread->pid, &local_iovec, 1, &remote_iovec, 1, 0);

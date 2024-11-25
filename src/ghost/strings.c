@@ -2,6 +2,13 @@
 #include <string.h>
 #include <ghost/strings.h>
 
+gh_conststr gh_conststr_fromc(const char * buf, size_t size) {
+    return (gh_conststr) { .buffer = buf, .size = size };
+}
+gh_conststr gh_conststr_fromz(const char * buf) {
+    return (gh_conststr) { .buffer = buf, .size = strlen(buf) };
+}
+
 gh_str gh_str_fromc(char * buf, size_t size, size_t capacity) {
     return (gh_str) {
         .buffer = buf,

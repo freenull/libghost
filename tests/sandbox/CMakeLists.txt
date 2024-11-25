@@ -1,4 +1,5 @@
 GhostTestNamespace(sandbox)
 
-GhostTest(hello_world VALGRINDWORKAROUND NOSANDBOX)
-GhostTest(threading VALGRINDWORKAROUND NOSANDBOX)
+GhostTest(hello_world NOSANDBOX)
+GhostTest(threading NOSANDBOX)
+GhostTest(std NOSANDBOX)

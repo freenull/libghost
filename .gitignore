@@ -5,3 +5,5 @@
 /.cache
 /docs
 vgcore.*
+/tests/sandbox/saved.ghperm
+/tests/sandbox/testfile.txt

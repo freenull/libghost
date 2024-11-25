@@ -7,6 +7,11 @@
 #include <stdbool.h>
 
 typedef struct {
+    const char * buffer;
+    size_t size;
+} gh_conststr;
+
+typedef struct {
     char * buffer;
     size_t size;
     size_t capacity;
@@ -14,6 +19,65 @@ typedef struct {
 
 #define GH_STR_FORMAT "%.*s"
 #define GH_STR_ARG(s) (int)s.size, s.buffer
+
+#define gh_conststr_fromlit(str) (gh_conststr_fromc((str), sizeof(str)/sizeof(char) - 1))
+gh_conststr gh_conststr_fromc(const char * buf, size_t size);
+gh_conststr gh_conststr_fromz(const char * buf);
+
+__attribute__((always_inline))
+static inline bool gh_conststr_eqlsrs(gh_conststr lhs, gh_conststr rhs) {
+    return lhs.size == rhs.size && strncmp(lhs.buffer, rhs.buffer, lhs.size) == 0;
+}
+
+__attribute__((always_inline))
+static inline bool gh_conststr_eqs(gh_conststr lhs, gh_conststr rhs) { return gh_conststr_eqlsrs(lhs, rhs); }
+
+__attribute__((always_inline))
+static inline bool gh_conststr_eqlcrs(const char * lhs, size_t lhs_size, gh_conststr rhs) {
+    return lhs_size == rhs.size && strncmp(lhs, rhs.buffer, lhs_size) == 0;
+}
+
+__attribute__((always_inline))
+static inline bool gh_conststr_eqlsrc(gh_conststr lhs, const char * rhs, size_t rhs_size) {
+    return lhs.size == rhs_size && strncmp(lhs.buffer, rhs, lhs.size) == 0;
+}
+
+__attribute__((always_inline))
+static inline bool gh_conststr_eqc(gh_conststr lhs, const char * rhs, size_t rhs_size) { return gh_conststr_eqlsrc(lhs, rhs, rhs_size); }
+
+__attribute__((always_inline))
+static inline bool gh_conststr_eqlcrc(const char * lhs, size_t lhs_size, const char * rhs, size_t rhs_size) {
+    return lhs_size == rhs_size && strncmp(lhs, rhs, lhs_size) == 0;
+}
+
+__attribute__((always_inline))
+static inline bool gh_conststr_eqlzrs(const char * lhs, gh_conststr rhs) {
+    return strlen(lhs) == rhs.size && strncmp(lhs, rhs.buffer, rhs.size) == 0;
+}
+
+__attribute__((always_inline))
+static inline bool gh_conststr_eqlsrz(gh_conststr lhs, const char * rhs) {
+    return lhs.size == strlen(rhs) && strncmp(lhs.buffer, rhs, lhs.size) == 0;
+}
+
+__attribute__((always_inline))
+static inline bool gh_conststr_eqz(gh_conststr lhs, const char * rhs) { return gh_conststr_eqlsrz(lhs, rhs); }
+
+__attribute__((always_inline))
+static inline bool gh_conststr_eqlzrc(const char * lhs, const char * rhs, size_t rhs_size) {
+    return strlen(lhs) == rhs_size && strncmp(lhs, rhs, rhs_size) == 0;
+}
+
+__attribute__((always_inline))
+static inline bool gh_conststr_eqlcrz(const char * lhs, size_t lhs_size, const char * rhs) {
+    return lhs_size == strlen(rhs) && strncmp(lhs, rhs, lhs_size) == 0;
+}
+
+__attribute__((always_inline))
+static inline bool gh_conststr_eqlzrz(const char * lhs, const char * rhs) {
+    size_t lhs_size = strlen(lhs);
+    return lhs_size == strlen(rhs) && strncmp(lhs, rhs, lhs_size) == 0;
+}
 
 #define gh_str_fromlit(str) (gh_str_fromc((str), sizeof(str)/sizeof(char) - 1, 0))
 gh_str gh_str_fromc(char * buf, size_t size, size_t capacity);

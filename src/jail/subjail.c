@@ -64,6 +64,7 @@ static gh_result lua_execute(gh_ipc * ipc, int script_id) {
     result_msg.type = GH_IPCMSG_LUARESULT;
     result_msg.result = lua_result;
     result_msg.script_id = script_id;
+
     gh_result res = gh_ipc_send(ipc, (gh_ipcmsg *)&result_msg, sizeof(gh_ipcmsg_luaresult));
     if (ghr_iserr(res)) return res;
 
@@ -221,15 +222,33 @@ static int luafunc_fdopen(lua_State * state) {
     return 1;
 }
 
+static int luafunc_udptr(lua_State * state) {
+    uintptr_t addr = (uintptr_t)(void*)lua_touserdata(state, 1);
+
+    char buf[16] = {0};
+    if (snprintf(buf, sizeof(buf), "%zx", addr) < 0) {
+        lua_pushnil(state);
+        return 1;
+    }
+
+    lua_pushlstring(state, buf, sizeof(buf));
+    return 1;
+}
+
 static gh_result lua_init(gh_ipc * ipc) {
     luaL_openlibs(L);
 
     lua_createtable(L, 0, 1);
+
     lua_pushvalue(L, -1);
     lua_setglobal(L, "c_support");
+
+    lua_pushvalue(L, -1);
     lua_pushcfunction(L, luafunc_fdopen);
     lua_setfield(L, -2, "fdopen");
 
+    lua_pushcfunction(L, luafunc_udptr);
+    lua_setfield(L, -2, "udptr");
 
     int r = 0;
 
@@ -246,15 +265,21 @@ static gh_result lua_init(gh_ipc * ipc) {
     char ipc_line[ipc_line_len + 1];
 
     if (snprintf(ipc_line, (unsigned int)ipc_line_len + 1, ipc_line_format, (uintptr_t)ipc) < 0) return GHR_JAIL_LUAINITFAIL;
+#pragma GCC diagnostic pop
 
     r = luaL_loadbuffer(L, ipc_line, (size_t)ipc_line_len, "init(ipc_line)");
     if (r != 0) goto err;
-#pragma GCC diagnostic pop
 
     r = gh_lua_pcall(L, 0, 0);
     if (r != 0) goto err;
 
     r = luaL_loadbuffer(L, gh_luainit_script_data, gh_luainit_script_data_len, "init");
+    if (r != 0) goto err;
+
+    r = gh_lua_pcall(L, 0, 0);
+    if (r != 0) goto err;
+
+    r = luaL_loadbuffer(L, gh_luastdlib_script_data, gh_luastdlib_script_data_len, "stdlib");
     if (r != 0) goto err;
 
     r = gh_lua_pcall(L, 0, 0);
@@ -319,7 +344,9 @@ int gh_subjail_main(gh_ipc * ipc, int parent_pid, gh_ipc * parent_ipc) {
         if (message_recv(ipc, msg)) break;
     }
 
-    fprintf(stderr, "subjail %d: quitting normally\n", gh_global_subjail_idx);
+    lua_close(L);
+
+    fprintf(stderr, "subjail %d: stopping gracefully\n", gh_global_subjail_idx);
     return 0;
 }
 

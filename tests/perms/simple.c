@@ -27,6 +27,7 @@
 #include <ghost/result.h>
 #include <ghost/perms/prompt.h>
 #include <ghost/perms/perms.h>
+#include <ghost/stdlib.h>
 
 static void func_open(gh_rpc * rpc, gh_rpcframe * frame) {
     (void)rpc;
@@ -48,7 +49,7 @@ static void func_open(gh_rpc * rpc, gh_rpcframe * frame) {
     printf("open call: path = %s, flags = %d\n", path_buf, (int)*flags_arg);
 
     int fd;
-    gh_result res = gh_perms_openat(&frame->thread->rpc->perms, frame->thread, AT_FDCWD, path_buf, (int)*flags_arg, 0, &fd);
+    gh_result res = gh_std_openat(frame->thread, AT_FDCWD, path_buf, (int)*flags_arg, 0, &fd);
     if (ghr_iserr(res)) {
         gh_rpcframe_failhere(frame, res);
     }
@@ -75,10 +76,10 @@ int main(void) {
 
     gh_rpc rpc;
     ghr_assert(gh_rpc_ctor(&rpc, &alloc, prompter));
-    ghr_assert(gh_rpc_register(&rpc, "open", func_open));
+    ghr_assert(gh_rpc_register(&rpc, "open", func_open, GH_RPCFUNCTION_THREADSAFE));
 
     gh_thread thread;
-    ghr_assert(gh_sandbox_newthread(&sandbox, &rpc, "thread", "my thread", &thread));
+    ghr_assert(gh_sandbox_newthread(&sandbox, &rpc, "thread", "my thread", GH_IPC_NOTIMEOUT, &thread));
 
     assert(write(pipefd[1], "x\n", 2) == 2);
 
@@ -110,10 +111,8 @@ int main(void) {
     assert(unlink(tempfile) == 0);
 
     ghr_assert(gh_bytebuffer_dtor(&buf));
-    ghr_assert(gh_thread_requestquit(&thread));
-    ghr_assert(gh_thread_dtor(&thread));
-    ghr_assert(gh_sandbox_requestquit(&sandbox));
-    ghr_assert(gh_sandbox_dtor(&sandbox));
+    ghr_assert(gh_thread_dtor(&thread, NULL));
+    ghr_assert(gh_sandbox_dtor(&sandbox, NULL));
 
     ghr_assert(gh_rpc_dtor(&rpc));
     assert(close(pipefd[0]) == 0);

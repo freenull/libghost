@@ -15,6 +15,9 @@
 extern char gh_luainit_script_data[];
 extern size_t gh_luainit_script_data_len;
 
+extern char gh_luastdlib_script_data[];
+extern size_t gh_luastdlib_script_data_len;
+
 gh_result gh_lua2result(int lua_result);
 
 int gh_lua_pcall(lua_State * L, int nargs, int nret);

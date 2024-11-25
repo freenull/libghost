@@ -15,7 +15,7 @@ typedef struct {
 } gh_bytebuffer;
 
 gh_result gh_bytebuffer_ctor(gh_bytebuffer * buffer, gh_alloc * alloc);
-gh_result gh_bytebuffer_append(gh_bytebuffer * buffer, char * bytes, size_t size);
+gh_result gh_bytebuffer_append(gh_bytebuffer * buffer, const char * bytes, size_t size);
 gh_result gh_bytebuffer_expand(gh_bytebuffer * buffer, size_t size, char ** out_ptr);
 gh_result gh_bytebuffer_clear(gh_bytebuffer * buffer);
 gh_result gh_bytebuffer_dtor(gh_bytebuffer * buffer);

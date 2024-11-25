@@ -83,6 +83,7 @@ GH_IPCMSG_ALIGN
 typedef struct {
     gh_ipcmsg_type type;
     pid_t pid;
+    bool wait_for_graceful;
 } gh_ipcmsg_killsubjail;
 
 GH_IPCMSG_ALIGN
@@ -233,6 +234,6 @@ gh_result gh_ipc_send(gh_ipc * ipc, gh_ipcmsg * msg, size_t msg_size);
  */
 gh_result gh_ipc_recv(gh_ipc * ipc, gh_ipcmsg * msg, int timeout_ms);
 
-gh_result gh_ipc_call(gh_ipc * ipc, const char * name, size_t argc, gh_ipcmsg_functioncall_arg * args, void * return_arg, size_t return_arg_size);
+gh_result gh_ipc_call(gh_ipc * ipc, const char * name, size_t argc, gh_ipcmsg_functioncall_arg * args, int * return_fd, void * return_arg, size_t return_arg_size);
 
 #endif

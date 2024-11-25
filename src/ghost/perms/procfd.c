@@ -126,8 +126,15 @@ gh_result gh_procfd_reopen(gh_procfd * procfd, gh_pathfd fd, int flags, mode_t c
     res = procfd_getfdfilename(procfd, fd, fdfilename);
     if (ghr_iserr(res)) return res;
 
-    int new_fd = openat(procfd->fd, fdfilename, flags, create_mode);
-    if (new_fd < 0) return ghr_errno(GHR_PROCFD_REOPENFAIL);
+    int new_fd = -1;
+
+    if (gh_pathfd_exists(fd)) {
+        new_fd = openat(procfd->fd, fdfilename, flags, create_mode);
+        if (new_fd < 0) return ghr_errno(GHR_PROCFD_REOPENFAIL);
+    } else {
+        new_fd = openat(fd.fd, fd.trailing_name, flags, create_mode);
+        if (new_fd < 0) return ghr_errno(GHR_PROCFD_REOPENFAIL);
+    }
 
     *out_fd = new_fd;
     return GHR_OK;

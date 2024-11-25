@@ -19,7 +19,7 @@ typedef char gh_permrequest_source[GH_PERMREQUEST_SOURCEMAX];
 typedef struct {
     gh_permrequest_id key;
     size_t value_len;
-    char * value;
+    const char * value;
 } gh_permrequest_field;
 
 #define GH_PERMREQUEST_MAXFIELDS 16

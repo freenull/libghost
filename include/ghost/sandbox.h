@@ -10,6 +10,8 @@
 #define GH_SANDBOX_NOLIMIT 0
 #define GH_SANDBOX_MAXWAITSUBJAILMS 5000
 
+#define GH_SANDBOX_TIMETOQUITMS 4000
+
 typedef struct {
     char name[GHOST_SANDBOXOPTIONS_NAME_MAX];
     size_t memory_limit_bytes;
@@ -36,17 +38,6 @@ typedef struct {
  */
 gh_result gh_sandbox_ctor(gh_sandbox * sandbox, gh_sandboxoptions options);
 
-/** @brief Waits for the process handling the sandbox to exit.
- *
- * @param sandbox Pointer to the sandbox object.
- *
- * @return @ref GHR_OK if the process exited successfully (with exit code 0).
- *         @ref GHR_JAIL_WAITFAIL if the wait(2) syscall failed unexpectedly.
- *         @ref GHR_JAIL_NONZEROEXIT if the process exited with a non-zero exit code. Use @ref ghr_exitcode to retrieve the exit code.
- *         @ref GHR_JAIL_KILLEDSIG if the process was killed by a signal. Use @ref ghr_signalno to retrieve the signal number.
- */
-gh_result gh_sandbox_wait(gh_sandbox * sandbox);
-
 /** @brief Reads sandbox options from a file pointed to by a file descriptor.
  *
  * @param fd          File descriptor pointing to the file containing the sandbox options structure.
@@ -62,9 +53,6 @@ gh_result gh_sandboxoptions_readfrom(int fd, gh_sandboxoptions * out_options);
  *
  * @return Result code.
  */
-gh_result gh_sandbox_dtor(gh_sandbox * sandbox);
-
-gh_result gh_sandbox_requestquit(gh_sandbox * sandbox);
-gh_result gh_sandbox_forcekill(gh_sandbox * sandbox);
+gh_result gh_sandbox_dtor(gh_sandbox * sandbox, gh_result * out_jailresult);
 
 #endif

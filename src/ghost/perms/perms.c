@@ -22,14 +22,14 @@ gh_result gh_perms_ctor(gh_perms * perms, gh_alloc * alloc) {
     return GHR_OK;
 }
 
-static gh_result perms_promptrequest(gh_perms * perms, gh_thread * thread, gh_abscanonicalpath canonical_path, gh_permfs_actionresult * action_result) {
+static gh_result perms_promptrequest(gh_perms * perms, gh_thread * thread, gh_abscanonicalpath canonical_path, const char * hint, gh_permfs_actionresult * action_result) {
     gh_result res = GHR_OK;
     gh_result inner_res = GHR_OK;
 
     gh_permfs_reqdata reqdata;
     res = gh_permfs_reqctor(
         &perms->filesystem, thread->safe_id,
-        canonical_path, action_result, &reqdata
+        canonical_path, hint, action_result, &reqdata
     );
     if (ghr_iserr(res)) return res;
 
@@ -60,6 +60,7 @@ static gh_result perms_promptrequest(gh_perms * perms, gh_thread * thread, gh_ab
         break;
 
     case GH_PERMRESPONSE_REJECTREMEMBER:
+        printf("REJECTREMEMBER mode_reject = %x\n", action_result->rejected_mode);
         res = gh_permfs_add(
             &perms->filesystem,
             (gh_permfs_ident) {
@@ -74,11 +75,6 @@ static gh_result perms_promptrequest(gh_perms * perms, gh_thread * thread, gh_ab
         if (ghr_isok(res)) res = GHR_PERMS_REJECTEDUSER;
         break;
 
-    case GH_PERMRESPONSE_EMERGENCYKILL:
-        res = gh_thread_forcekill(thread);
-        if (ghr_isok(res)) res = GHR_PERMS_REJECTEDKILL;
-        break;
-
     default:
         res = GHR_PERMS_REJECTEDPROMPT;
         break;
@@ -90,9 +86,10 @@ end:
     return res;
 }
 
-gh_result gh_perms_actfilesystem(gh_perms * perms, gh_thread * thread, gh_pathfd fd, gh_permfs_mode mode) {
+gh_result gh_perms_actfilesystem(gh_thread * thread, gh_pathfd fd, gh_permfs_mode mode, const char * hint) {
     gh_result res = GHR_OK;
     gh_result inner_res = GHR_OK;
+    gh_perms * perms = &thread->perms;
 
     gh_abscanonicalpath canonical_path;
     res = gh_procfd_fdpathctor(&perms->filesystem.procfd, fd, &canonical_path);
@@ -106,7 +103,7 @@ gh_result gh_perms_actfilesystem(gh_perms * perms, gh_thread * thread, gh_pathfd
     res = gh_permfs_act(&perms->filesystem, modeset, mode, &actionres);
 
     if (ghr_is(res, GHR_PERMS_REJECTEDPROMPT)) {
-        res = perms_promptrequest(perms, thread, canonical_path, &actionres);
+        res = perms_promptrequest(perms, thread, canonical_path, hint, &actionres);
     }
 
     inner_res = gh_procfd_fdpathdtor(&perms->filesystem.procfd, &canonical_path);
@@ -114,28 +111,6 @@ gh_result gh_perms_actfilesystem(gh_perms * perms, gh_thread * thread, gh_pathfd
     return res;
 }
 
-
-gh_result gh_perms_openat(gh_perms * perms, gh_thread * thread, int dirfd, const char * path, int flags, mode_t create_mode, int * out_fd) {
-    gh_result res = GHR_OK;
-
-    gh_pathfd pathfd = {0};
-    res = gh_pathfd_open(dirfd, path, &pathfd);
-    if (ghr_iserr(res)) return res;
-
-    gh_permfs_mode mode;
-    res = gh_permfs_fcntlflags2permfsmode(flags, &mode);
-    if (ghr_iserr(res)) return res;
-
-    res = gh_perms_actfilesystem(perms, thread, pathfd, mode);
-    if (ghr_iserr(res)) return res;
-
-    int new_fd = -1;
-    res = gh_procfd_reopen(&perms->filesystem.procfd, pathfd, flags, create_mode, &new_fd);
-    if (ghr_iserr(res)) return res;
-
-    *out_fd = new_fd;
-    return GHR_OK;
-}
 
 gh_result gh_perms_dtor(gh_perms * perms) {
     gh_result res = gh_permfs_dtor(&perms->filesystem);

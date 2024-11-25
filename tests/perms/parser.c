@@ -29,7 +29,7 @@ int main(void) {
     ghr_assert(gh_rpc_ctor(&rpc, &alloc, prompter));
 
     gh_thread thread;
-    ghr_assert(gh_sandbox_newthread(&sandbox, &rpc, "thread", "my thread", &thread));
+    ghr_assert(gh_sandbox_newthread(&sandbox, &rpc, "thread", "my thread", GH_IPC_NOTIMEOUT, &thread));
 
     gh_perms perms;
     ghr_assert(gh_perms_ctor(&perms, &alloc));
@@ -49,14 +49,14 @@ int main(void) {
     ghr_assert(gh_pathfd_open(AT_FDCWD, "/tmp", &fd));
 
     // both READ and CREATEDIR are 'self accept' in /tmp entry
-    ghr_assert(gh_perms_actfilesystem(&perms, &thread, fd, GH_PERMFS_CREATEDIR | GH_PERMFS_READ));
+    ghr_assert(gh_perms_actfilesystem(&thread, fd, GH_PERMFS_CREATEDIR | GH_PERMFS_READ, NULL));
 
     // WRITE is 'self reject'
-    ghr_asserterr(GHR_PERMS_REJECTEDPOLICY, gh_perms_actfilesystem(&perms, &thread, fd, GH_PERMFS_CREATEDIR | GH_PERMFS_READ | GH_PERMFS_WRITE));
+    ghr_asserterr(GHR_PERMS_REJECTEDPOLICY, gh_perms_actfilesystem(&thread, fd, GH_PERMFS_CREATEDIR | GH_PERMFS_READ | GH_PERMFS_WRITE, NULL));
 
     assert(write(pipefd[1], "n\n", 2) == 2); // force next simpletui request to REJECT
     // CREATEFILE is explicit 'self prompt', so the prompt will appear and exit with REJECT (simpletui input n/N)
-    ghr_asserterr(GHR_PERMS_REJECTEDUSER, gh_perms_actfilesystem(&perms, &thread, fd, GH_PERMFS_CREATEDIR | GH_PERMFS_READ | GH_PERMFS_CREATEFILE));
+    ghr_asserterr(GHR_PERMS_REJECTEDUSER, gh_perms_actfilesystem(&thread, fd, GH_PERMFS_CREATEDIR | GH_PERMFS_READ | GH_PERMFS_CREATEFILE, NULL));
     ghr_assert(gh_pathfd_close(fd));
 
 
@@ -65,30 +65,30 @@ int main(void) {
 
 
     // READ in /tmp is 'children accept'
-    ghr_assert(gh_perms_actfilesystem(&perms, &thread, fd, GH_PERMFS_READ));
+    ghr_assert(gh_perms_actfilesystem(&thread, fd, GH_PERMFS_READ, NULL));
     assert(write(pipefd[1], "x\n", 2) == 2); // force next simpletui request to REJECT AND REMEMBER
 
     // CREATEFILE is not specified under 'children' in /tmp, so default action is used (prompt), prompt will return REJECT AND REMEMBER
-    ghr_asserterr(GHR_PERMS_REJECTEDUSER, gh_perms_actfilesystem(&perms, &thread, fd, GH_PERMFS_CREATEFILE));
+    ghr_asserterr(GHR_PERMS_REJECTEDUSER, gh_perms_actfilesystem(&thread, fd, GH_PERMFS_CREATEFILE, NULL));
 
     // because previous prompt was REJECTED AND REMEMBER, next attempt returns rejected by policy instead of rejected by user
-    ghr_asserterr(GHR_PERMS_REJECTEDPOLICY, gh_perms_actfilesystem(&perms, &thread, fd, GH_PERMFS_CREATEFILE));
+    ghr_asserterr(GHR_PERMS_REJECTEDPOLICY, gh_perms_actfilesystem(&thread, fd, GH_PERMFS_CREATEFILE, NULL));
 
     // WRITE is explicitly 'children reject' under /tmp
-    ghr_asserterr(GHR_PERMS_REJECTEDPOLICY, gh_perms_actfilesystem(&perms, &thread, fd, GH_PERMFS_WRITE));
-    ghr_assert(gh_perms_actfilesystem(&perms, &thread, fd, GH_PERMFS_READ));
+    ghr_asserterr(GHR_PERMS_REJECTEDPOLICY, gh_perms_actfilesystem(&thread, fd, GH_PERMFS_WRITE, NULL));
+    ghr_assert(gh_perms_actfilesystem(&thread, fd, GH_PERMFS_READ, NULL));
     ghr_assert(gh_pathfd_close(fd));
 
     // TESTING PERMISSIONS ON /foobar.txt
     ghr_assert(gh_pathfd_open(AT_FDCWD, "/foobar.txt", &fd));
 
     // READ on /foobar.txt is 'self accept'
-    ghr_assert(gh_perms_actfilesystem(&perms, &thread, fd, GH_PERMFS_READ));
+    ghr_assert(gh_perms_actfilesystem(&thread, fd, GH_PERMFS_READ, NULL));
 
     assert(write(pipefd[1], "n\n", 2) == 2); // force next simpletui request to REJECT
 
     // no mode other than READ is specified on /foobar.txt, so default action is used (prompt), prompt will return REJECT
-    ghr_asserterr(GHR_PERMS_REJECTEDUSER, gh_perms_actfilesystem(&perms, &thread, fd, GH_PERMFS_CREATEFILE));
+    ghr_asserterr(GHR_PERMS_REJECTEDUSER, gh_perms_actfilesystem(&thread, fd, GH_PERMFS_CREATEFILE, NULL));
 
     assert(close(permfd) >= 0);
 
@@ -112,11 +112,9 @@ int main(void) {
 
     ghr_assert(gh_perms_dtor(&perms));
 
-    ghr_assert(gh_thread_requestquit(&thread));
-    ghr_assert(gh_thread_dtor(&thread));
+    ghr_assert(gh_thread_dtor(&thread, NULL));
 
-    ghr_assert(gh_sandbox_requestquit(&sandbox));
-    ghr_assert(gh_sandbox_dtor(&sandbox));
+    ghr_assert(gh_sandbox_dtor(&sandbox, NULL));
 
     ghr_assert(gh_rpc_dtor(&rpc));
 

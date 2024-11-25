@@ -26,7 +26,7 @@ gh_result gh_bytebuffer_ctor(gh_bytebuffer * buffer, gh_alloc * alloc) {
     return res;
 }
 
-gh_result gh_bytebuffer_append(gh_bytebuffer * buffer, char * bytes, size_t size) {
+gh_result gh_bytebuffer_append(gh_bytebuffer * buffer, const char * bytes, size_t size) {
     char * target = NULL;
     gh_result res = gh_bytebuffer_expand(buffer, size, &target);
     if (ghr_iserr(res)) return res;

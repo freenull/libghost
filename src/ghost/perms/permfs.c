@@ -9,28 +9,16 @@
 bool gh_permfs_nextmodeflag(gh_permfs_mode * state, gh_permfs_mode * out_flag) {
     if (*state == 0) return false;
 
-    gh_permfs_mode m;
+    for (size_t i = 0; i < sizeof(gh_permfs_mode) * 8; i++) {
+        gh_permfs_mode flag = (*state) & (1 << i);
+        if (flag == 0) continue;
 
-    if      ((m = (*state & GH_PERMFS_CREATEFILE))) { *out_flag = m; *state &= ~(m); }
-    else if ((m = (*state & GH_PERMFS_CREATEDIR)))  { *out_flag = m; *state &= ~(m); }
-    else if ((m = (*state & GH_PERMFS_READ)))       { *out_flag = m; *state &= ~(m); }
-    else if ((m = (*state & GH_PERMFS_WRITE)))      { *out_flag = m; *state &= ~(m); }
-    else if ((m = (*state & GH_PERMFS_UNLINK)))     { *out_flag = m; *state &= ~(m); }
+        *state &= ~flag;
+        *out_flag = flag;
+        break;
+    }
 
     return true;
-}
-
-const char * gh_permfs_strmodeflag(gh_permfs_mode flag) {
-    switch(flag) {
-    case GH_PERMFS_CREATEFILE: return "createfile";
-    case GH_PERMFS_CREATEDIR: return "createdir";
-    case GH_PERMFS_READ: return "read";
-    case GH_PERMFS_WRITE: return "write";
-    case GH_PERMFS_UNLINK: return "unlink";
-
-    case GH_PERMFS_NONE:
-    default: return NULL;
-    }
 }
 
 static gh_result permfsfilelist_dtorelement(gh_dynamicarray da, void * elem_voidp, void * userdata) {
@@ -189,15 +177,6 @@ gh_result gh_permfs_act(gh_permfs * permfs, gh_permfs_modeset modeset, gh_permfs
         return GHR_PERMS_REJECTEDPOLICY;
     }
 
-    if ((modeset.mode_prompt & mode) != 0) {
-        if (out_result != NULL) {
-            out_result->action = GH_PERMACTION_PROMPT;
-            out_result->rejected_mode = mode & (~modeset.mode_prompt);
-            out_result->default_policy = false;
-        }
-        return GHR_PERMS_REJECTEDPROMPT;
-    }
-
     if ((modeset.mode_accept & mode) == mode) {
         if (out_result != NULL) {
             out_result->action = GH_PERMACTION_ACCEPT;
@@ -205,6 +184,16 @@ gh_result gh_permfs_act(gh_permfs * permfs, gh_permfs_modeset modeset, gh_permfs
             out_result->default_policy = false;
         }
         return GHR_OK;
+    }
+
+
+    if ((modeset.mode_prompt & mode) != 0) {
+        if (out_result != NULL) {
+            out_result->action = GH_PERMACTION_PROMPT;
+            out_result->rejected_mode = modeset.mode_prompt;
+            out_result->default_policy = false;
+        }
+        return GHR_PERMS_REJECTEDPROMPT;
     }
 
     gh_permaction action = permfs->default_action;
@@ -238,49 +227,30 @@ static const gh_permrequest permfs_reqtemplate = {
 };
 
 static gh_result permfs_mode_fill(gh_bytebuffer * buffer, gh_permfs_mode mode) {
-    gh_result res;
-    size_t offs = 1;
+    gh_result res = GHR_OK;
 
-    if (mode & GH_PERMFS_CREATEFILE) {
-        res = gh_bytebuffer_append(buffer, (char*)",createfile" + offs, sizeof("createfile") - offs);
+    bool first = true;
+    for (size_t i = 0; i < sizeof(gh_permfs_mode) * 8; i++) {
+        gh_permfs_mode flag = mode & (1 << i);
+        if (flag == 0) continue;
+
+        const char * flagstr = gh_permfs_mode_ident(flag);
+        if (flagstr == NULL) continue;
+
+        if (!first) {
+            res = gh_bytebuffer_append(buffer, ",", 1);
+            if (ghr_iserr(res)) return res;
+        }
+        first = false;
+
+        res = gh_bytebuffer_append(buffer, flagstr, strlen(flagstr));
         if (ghr_iserr(res)) return res;
-        offs = 0;
-    }
-    if (mode & GH_PERMFS_CREATEDIR) {
-        res = gh_bytebuffer_append(buffer, (char*)",createdir" + offs, sizeof("createdir") - offs);
-        if (ghr_iserr(res)) return res;
-        offs = 0;
-    }
-    if (mode & GH_PERMFS_READ) {
-        res = gh_bytebuffer_append(buffer, (char*)",read" + offs, sizeof("read") - offs);
-        if (ghr_iserr(res)) return res;
-        offs = 0;
-    }
-    if (mode & GH_PERMFS_WRITE) {
-        res = gh_bytebuffer_append(buffer, (char*)",write" + offs, sizeof("write") - offs);
-        if (ghr_iserr(res)) return res;
-        offs = 0;
-    }
-    if (mode & GH_PERMFS_UNLINK) {
-        res = gh_bytebuffer_append(buffer, (char*)",unlink" + offs, sizeof("unlink") - offs);
-        if (ghr_iserr(res)) return res;
-        offs = 0;
     }
 
     return GHR_OK;
 }
 
-static gh_permfs_mode permfs_mode_fromstr(gh_str str) {
-    if (gh_str_eqz(str, "createfile")) return GH_PERMFS_CREATEFILE;
-    if (gh_str_eqz(str, "createdir")) return GH_PERMFS_CREATEDIR;
-    if (gh_str_eqz(str, "read")) return GH_PERMFS_READ;
-    if (gh_str_eqz(str, "write")) return GH_PERMFS_WRITE;
-    if (gh_str_eqz(str, "unlink")) return GH_PERMFS_UNLINK;
-
-    return 0;
-}
-
-gh_result gh_permfs_reqctor(gh_permfs * permfs, const char * source, gh_abscanonicalpath path, gh_permfs_actionresult * result, gh_permfs_reqdata * out_reqdata) {
+gh_result gh_permfs_reqctor(gh_permfs * permfs, const char * source, gh_abscanonicalpath path, const char * hint, gh_permfs_actionresult * result, gh_permfs_reqdata * out_reqdata) {
     gh_result inner_res = GHR_OK;
 
     gh_bytebuffer buf;
@@ -300,6 +270,12 @@ gh_result gh_permfs_reqctor(gh_permfs * permfs, const char * source, gh_abscanon
     strcpy(out_reqdata->request.source, source);
     out_reqdata->request.fields[1].value = buf.buffer;
     out_reqdata->request.fields[1].value_len = buf.size - 1;
+
+    if (hint != NULL) {
+        strcpy(out_reqdata->request.fields[2].key, "hint");
+        out_reqdata->request.fields[2].value = hint;
+        out_reqdata->request.fields[2].value_len = strlen(hint);
+    }
 
     // request/rejected_mode-based requests will NEVER have the mode_children field,
     // as all automatic requests are executed with the lowest possible range of
@@ -337,7 +313,7 @@ gh_result gh_permfs_dtor(gh_permfs * permfs) {
     return res;
 }
 
-gh_result gh_permfs_fcntlflags2permfsmode(int fcntl_flags, gh_permfs_mode * out_mode) {
+gh_result gh_permfs_fcntlflags2permfsmode(int fcntl_flags, mode_t create_accessmode, gh_pathfd pathfd, gh_permfs_mode * out_mode) {
 #define GH_PERMS_FCNTLMODE2PERMMODE_EXCHANGEFLAG(fcntl_flag, permfs_flag) if (fcntl_flags & (fcntl_flag)) { \
         permfs_mode = (permfs_mode | (permfs_flag)); \
         fcntl_flags = (int)((unsigned int)fcntl_flags & (~((unsigned int)(fcntl_flag)))); \
@@ -362,8 +338,58 @@ gh_result gh_permfs_fcntlflags2permfsmode(int fcntl_flags, gh_permfs_mode * out_
         return GHR_PERMFS_BADFCNTLMODE;
     }
     
+    if (fcntl_flags & O_TRUNC) fcntl_flags &= ~O_TRUNC;
     GH_PERMS_FCNTLMODE2PERMMODE_EXCHANGEFLAG(O_APPEND, GH_PERMFS_WRITE);
-    GH_PERMS_FCNTLMODE2PERMMODE_EXCHANGEFLAG(O_CREAT, GH_PERMFS_CREATEFILE);
+
+    if (fcntl_flags & O_CREAT) {
+        fcntl_flags = (int)((unsigned int)fcntl_flags & (~((unsigned int)(O_CREAT))));
+
+        if (!gh_pathfd_exists(pathfd)) {
+            permfs_mode = permfs_mode | GH_PERMFS_CREATEFILE;
+
+            mode_t cm = 0;
+            if ((cm = create_accessmode & S_IRUSR)) {
+                permfs_mode |= GH_PERMFS_ACCESS_USER_READ;
+                create_accessmode &= ~cm;
+            }
+            if ((cm = create_accessmode & S_IWUSR)) {
+                permfs_mode |= GH_PERMFS_ACCESS_USER_WRITE;
+                create_accessmode &= ~cm;
+            }
+            if ((cm = create_accessmode & S_IXUSR)) {
+                permfs_mode |= GH_PERMFS_ACCESS_USER_EXECUTE;
+                create_accessmode &= ~cm;
+            }
+
+            if ((cm = create_accessmode & S_IRGRP)) {
+                permfs_mode |= GH_PERMFS_ACCESS_GROUP_READ;
+                create_accessmode &= ~cm;
+            }
+            if ((cm = create_accessmode & S_IWGRP)) {
+                permfs_mode |= GH_PERMFS_ACCESS_GROUP_WRITE;
+                create_accessmode &= ~cm;
+            }
+            if ((cm = create_accessmode & S_IXGRP)) {
+                permfs_mode |= GH_PERMFS_ACCESS_GROUP_EXECUTE;
+                create_accessmode &= ~cm;
+            }
+
+            if ((cm = create_accessmode & S_IROTH)) {
+                permfs_mode |= GH_PERMFS_ACCESS_OTHER_READ;
+                create_accessmode &= ~cm;
+            }
+            if ((cm = create_accessmode & S_IWOTH)) {
+                permfs_mode |= GH_PERMFS_ACCESS_OTHER_WRITE;
+                create_accessmode &= ~cm;
+            }
+            if ((cm = create_accessmode & S_IXOTH)) {
+                permfs_mode |= GH_PERMFS_ACCESS_OTHER_EXECUTE;
+                create_accessmode &= ~cm;
+            }
+
+            if (create_accessmode != 0) return GHR_PERMFS_BADFCNTLMODE;
+        }
+    }
     GH_PERMS_FCNTLMODE2PERMMODE_EXCHANGEFLAG(O_DIRECTORY, 0);
 
     if (fcntl_flags != 0) {
@@ -432,7 +458,11 @@ static gh_result permfsparser_setfield(gh_permparser * parser, void * entry_void
             if (ghr_is(res, GHR_PERMPARSER_EXPECTEDSTRING)) break;
             if (ghr_iserr(res)) return res;
 
-            gh_permfs_mode new_mode_flag = permfs_mode_fromstr(arg);
+            char flag_ident[arg.size + 1];
+            strcpy(flag_ident, arg.buffer);
+            flag_ident[arg.size] = '\0';
+
+            gh_permfs_mode new_mode_flag = gh_permfs_mode_fromident(flag_ident);
             if (new_mode_flag == 0) return gh_permparser_resourceerror(parser, "Unknown mode flag");
 
             *mode |= new_mode_flag;
@@ -470,7 +500,8 @@ static gh_result permfs_writemode(gh_permfs * permfs, gh_permwriter * writer, co
     gh_permfs_mode iter = mode;
     gh_permfs_mode flag;
     while (gh_permfs_nextmodeflag(&iter, &flag)) {
-        const char * flag_str = gh_permfs_strmodeflag(flag);
+        const char * flag_str = gh_permfs_mode_ident(flag);
+        if (flag_str == NULL) return GHR_PERMFS_UNKNOWNMODE;
         res = gh_permwriter_fieldargstring(writer, flag_str, strlen(flag_str));
         if (ghr_iserr(res)) return res;
     }

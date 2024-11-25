@@ -21,6 +21,8 @@ parser.add_argument("-p", "--prefix", default = "", help = "Enum entry prefix")
 parser.add_argument("-n", "--name", required = True, help = "Name of the enum definition")
 parser.add_argument("-c", "--csv", required = True, help = "CSV file containing enum definitions")
 parser.add_argument("-1", "--first-row", action = "store_true", help = "Treat first row as an enum entry")
+parser.add_argument("-i", "--ident", action = "store_true", help = "Add a new column Ident between EnumKey and Value, generate _fromident and _ident")
+parser.add_argument("-u", "--unknown", help = "Key of entry to represent an unknown value/invalid return")
 parser.add_argument("-H", "--header", required = True, help = "Path to output header file")
 parser.add_argument("-S", "--source", required = True, help = "Path to output source file")
 args = parser.parse_args()
@@ -28,8 +30,9 @@ args = parser.parse_args()
 print(f"Generating enum {args.name}")
 
 class EnumEntry:
-    def __init__(self, key, value, description):
+    def __init__(self, key, ident, value, description):
         self.key = key
+        self.ident = ident
         self.value = value
         self.description = description
 
@@ -54,8 +57,17 @@ with open(args.csv, "r") as csv_f:
             continue
 
         key = row[0]
-        value = row[1]
-        description = row[2]
+        ident = None
+        value = None
+        description = None
+
+        if args.ident:
+            ident = row[1]
+            value = row[2]
+            description = row[3]
+        else:
+            value = row[1]
+            description = row[2]
 
         if value.strip().startswith("::"):
             value = value.strip()[len("::"):]
@@ -73,13 +85,28 @@ with open(args.csv, "r") as csv_f:
             value = int(value)
             prev_value = value
 
-        entries.append(EnumEntry(key, value, description))
-        print(f"{args.prefix}{key} = {value} ({description})")
+        entries.append(EnumEntry(key, ident, value, description))
+
+        if args.ident:
+            print(f"{args.prefix}{key} [{ident}] = {value} ({description})")
+        else:
+            print(f"{args.prefix}{key} = {value} ({description})")
 
 if len(entries) == 0:
     raise RuntimeError("CSV enum list entry is empty")
 
 last_entry = entries[-1]
+
+unknown_entry = None
+if args.unknown is not None:
+    for entry in entries:
+        if entry.key == args.unknown:
+            unknown_entry = entry
+
+    if unknown_entry is None:
+        raise RuntimeError(f"Invalid unknown entry '{args.unknown}'")
+else:
+    unknown_entry = last_entry
 
 header_rel_from_source = os.path.relpath(args.header, os.path.dirname(args.source))
 
@@ -98,6 +125,10 @@ with open(args.header, "w") as header_f:
     print(f"const char * {args.name}_desc({args.name} value);", file = header_f)
     print(f"{args.name} {args.name}_fromname(const char * name);", file = header_f)
 
+    if args.ident:
+        print(f"const char * {args.name}_ident({args.name} value);", file = header_f)
+        print(f"{args.name} {args.name}_fromident(const char * ident);", file = header_f)
+
 
 source_dirname = os.path.dirname(args.source)
 if source_dirname != "":
@@ -112,7 +143,7 @@ with open(args.source, "w") as source_f:
     for entry in entries:
         print(f"    case {args.prefix}{entry.key}: return {json.dumps(entry.key)};", file = source_f)
 
-    print(f"    default: return {json.dumps(last_entry.key)};", file = source_f)
+    print(f"    default: return {json.dumps(unknown_entry.key)};", file = source_f)
     print(f"    }}", file = source_f)
     print(f"}}", file = source_f)
 
@@ -121,7 +152,7 @@ with open(args.source, "w") as source_f:
     for entry in entries:
         print(f"    case {args.prefix}{entry.key}: return {json.dumps(entry.description)};", file = source_f)
 
-    print(f"    default: return {json.dumps(last_entry.description)};", file = source_f)
+    print(f"    default: return {json.dumps(unknown_entry.description)};", file = source_f)
     print(f"    }}", file = source_f)
     print(f"}}", file = source_f)
 
@@ -129,5 +160,23 @@ with open(args.source, "w") as source_f:
     for entry in entries:
         print(f"    if (strncmp(name, {json.dumps(entry.key)}, {len(entry.key) + 1}) == 0) return {args.prefix}{entry.key};", file = source_f)
 
-    print(f"    return {args.prefix}{entry.key};", file = source_f)
+    print(f"    return {args.prefix}{unknown_entry.key};", file = source_f)
     print(f"}}", file = source_f)
+
+    if args.ident:
+        print(f"{args.name} {args.name}_fromident(const char * ident) {{", file = source_f)
+        for entry in entries:
+            print(f"    if (strncmp(ident, {json.dumps(entry.ident)}, {len(entry.ident) + 1}) == 0) return {args.prefix}{entry.key};", file = source_f)
+
+        print(f"    return {args.prefix}{unknown_entry.key};", file = source_f)
+        print(f"}}", file = source_f)
+
+        print(f"const char * {args.name}_ident({args.name} value) {{", file = source_f)
+        print(f"    switch(value) {{", file = source_f)
+        for entry in entries:
+            print(f"    case {args.prefix}{entry.key}: return {json.dumps(entry.ident)};", file = source_f)
+
+        print(f"    default: return NULL;", file = source_f)
+        print(f"    }}", file = source_f)
+        print(f"}}", file = source_f)
+
