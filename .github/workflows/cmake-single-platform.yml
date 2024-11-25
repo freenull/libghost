@@ -22,6 +22,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Install debug symbols for ld.so
+      run: sudo apt install libc6-dbg
+
     - name: Retrieve Valgrind
       run: git clone https://sourceware.org/git/valgrind.git ${{github.workspace}}/valgrind
 
