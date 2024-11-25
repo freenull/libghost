@@ -11,7 +11,6 @@
 #include <ghost/rpc.h>
 #include <pthread.h>
 
-static pthread_mutex_t global_banner_mutex = PTHREAD_MUTEX_INITIALIZER;
 #define GLOBAL_BANNER_MAXSIZE 256
 static char global_banner[GLOBAL_BANNER_MAXSIZE];
 
