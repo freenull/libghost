@@ -1,3 +1,4 @@
+#include "ghost/perms/prompt.h"
 #include <string.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -40,11 +41,18 @@ int main(void) {
     ghr_assert(gh_sandbox_ctor(&sandbox, options));
 
     gh_rpc rpc;
-    ghr_assert(gh_rpc_ctor(&rpc, &alloc, gh_permprompter_simpletui(STDIN_FILENO)));
+    ghr_assert(gh_rpc_ctor(&rpc, &alloc));
     ghr_assert(gh_rpc_register(&rpc, "print", func_print, GH_RPCFUNCTION_THREADSAFE));
 
     gh_thread thread;
-    ghr_assert(gh_sandbox_newthread(&sandbox, &rpc, "thread", "thread", GH_IPC_NOTIMEOUT, &thread));
+    ghr_assert(gh_thread_ctor(&thread, (gh_threadoptions) {
+        .sandbox = &sandbox, 
+        .prompter = gh_permprompter_simpletui(STDIN_FILENO),
+        .rpc = &rpc,
+        .name = "thread",
+        .safe_id = "thread",
+        .default_timeout_ms = GH_IPC_NOTIMEOUT
+    }));
 
     char s[] =
         "local ghost = require('ghost')\n"

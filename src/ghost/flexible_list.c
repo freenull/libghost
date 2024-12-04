@@ -1,6 +1,6 @@
 #define _GNU_SOURCE
 #include <string.h>
-#include <ghost/variable_list.h>
+#include <ghost/flexible_list.h>
 
 gh_result gh_flexiblelist_ctor(gh_flexiblelist vl, const gh_flexiblelistoptions * options) {
     *vl.buffer = NULL;

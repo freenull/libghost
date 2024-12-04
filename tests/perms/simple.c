@@ -75,11 +75,18 @@ int main(void) {
     /* gh_permprompter prompter = gh_permprompter_simpletui(STDIN_FILENO); */
 
     gh_rpc rpc;
-    ghr_assert(gh_rpc_ctor(&rpc, &alloc, prompter));
+    ghr_assert(gh_rpc_ctor(&rpc, &alloc));
     ghr_assert(gh_rpc_register(&rpc, "open", func_open, GH_RPCFUNCTION_THREADSAFE));
 
     gh_thread thread;
-    ghr_assert(gh_sandbox_newthread(&sandbox, &rpc, "thread", "my thread", GH_IPC_NOTIMEOUT, &thread));
+    ghr_assert(gh_thread_ctor(&thread, (gh_threadoptions) {
+        .sandbox = &sandbox,
+        .rpc = &rpc,
+        .prompter = prompter,
+        .name = "thread",
+        .safe_id = "my thread",
+        .default_timeout_ms = GH_IPC_NOTIMEOUT
+    }));
 
     assert(write(pipefd[1], "x\n", 2) == 2);
 

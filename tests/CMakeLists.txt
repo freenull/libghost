@@ -7,7 +7,7 @@ endfunction()
 function(GhostTest name)
     cmake_parse_arguments(
         GHTEST
-        "MAYLEAK;NOSANDBOX"
+        "MAYLEAK;NOSANDBOX;INTERACTIVE"
         "TIMEOUT;STDIN"
         ""
         ${ARGN}

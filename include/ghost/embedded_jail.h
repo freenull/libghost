@@ -4,6 +4,10 @@
 #include <stdbool.h>
 #include <ghost/result.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /** @brief Data of the embedded jail executable. */
 extern unsigned char gh_embeddedjail_exe_data[];
 
@@ -37,5 +41,9 @@ gh_result gh_embeddedjail_createfd(int * out_fd);
  * @return On success, the function doesn't return. On failure, a result code is returned.
  */
 gh_result gh_embeddedjail_exec(const char * name, int options_fd);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

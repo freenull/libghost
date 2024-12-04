@@ -15,6 +15,7 @@
 #include <sys/syscall.h>
 #include <sys/resource.h>
 #include <ghost/ipc.h>
+#include <ghost/variant.h>
 #include <ghost/result.h>
 #include <jail/jail.h>
 #include <jail/subjail.h>
@@ -145,6 +146,229 @@ static gh_result lua_executefile(gh_ipc * ipc, int fd, const char * chunk_name) 
     return lua_execute(ipc, script_id);
 }
 
+static gh_result lua_sethostvariable(gh_ipc * ipc, gh_ipcmsg_luahostvariable * msg) {
+    int script_id;
+    gh_result res = lua_sendinfomsg(ipc, &script_id);
+    if (ghr_iserr(res)) return res;
+
+    lua_getglobal(L, "host");
+    if (lua_type(L, -1) == LUA_TNIL) {
+        lua_pop(L, 1);
+        lua_createtable(L, 0, 1);
+        lua_pushvalue(L, -1);
+        lua_setglobal(L, "host");
+    }
+
+    if (msg->table_index > 0) {
+        lua_pushstring(L, msg->name);
+        lua_gettable(L, -2);
+        if (lua_type(L, -1) == LUA_TNIL) {
+            lua_pop(L, 1);
+            lua_createtable(L, 1, 0);
+            lua_pushstring(L, msg->name);
+            lua_pushvalue(L, -2);
+            lua_settable(L, -4);
+        }
+        lua_pushnumber(L, msg->table_index);
+    } else {
+        lua_pushstring(L, msg->name);
+    }
+
+    switch(msg->datatype) {
+    case GH_IPCMSG_LUAHOSTVARIABLE_INT:
+        lua_pushnumber(L, (lua_Number)msg->t_integer);
+        break;
+    case GH_IPCMSG_LUAHOSTVARIABLE_DOUBLE:
+        lua_pushnumber(L, (lua_Number)msg->t_double);
+        break;
+    case GH_IPCMSG_LUAHOSTVARIABLE_STRING: {
+        size_t len = msg->t_string.len;
+        if (len + 1 > GH_IPCMSG_LUAHOSTVARIABLE_STRINGMAX) {
+            len = GH_IPCMSG_LUAHOSTVARIABLE_STRINGMAX - 1;
+        }
+        lua_pushlstring(L, msg->t_string.buffer, msg->t_string.len);
+        break;
+    }
+    default:
+        lua_pushnil(L);
+    }
+
+    lua_settable(L, -3);
+    lua_pop(L, 1);
+
+    if (msg->table_index > 0) {
+        lua_pop(L, 1);
+    }
+
+    gh_ipcmsg_luaresult result_msg = {
+        .type = GH_IPCMSG_LUARESULT,
+        .result = GHR_OK,
+        .script_id = script_id,
+        .error_msg = {0}
+    };
+    res = gh_ipc_send(ipc, (gh_ipcmsg *)&result_msg, sizeof(gh_ipcmsg_luaresult));
+    if (ghr_iserr(res)) return res;
+    return GHR_OK;
+}
+
+static gh_result lua_callfunction_pushparam(gh_ipc * ipc, gh_fdmem * mem, gh_variant * param) {
+    (void)ipc;
+    (void)mem;
+
+    switch(param->type) {
+    case GH_VARIANT_NIL: {
+        lua_pushnil(L);
+        return GHR_OK;
+    }
+    case GH_VARIANT_INT: {
+        lua_pushnumber(L, (lua_Number)param->t_int);
+        return GHR_OK;
+    }
+    case GH_VARIANT_DOUBLE: {
+        lua_pushnumber(L, (lua_Number)param->t_double);
+        return GHR_OK;
+    }
+    case GH_VARIANT_STRING: {
+        lua_pushlstring(L, param->t_string_data, param->t_string_len);
+        return GHR_OK;
+    }
+    default: return GHR_JAIL_LUACALLPARAM;
+    }
+}
+
+static gh_result lua_callfunction_getreturn(gh_ipc * ipc, gh_fdmem * mem, gh_fdmem_ptr * out_virtptr) {
+    (void)ipc;
+
+    int type = lua_type(L, -1);
+    gh_result res = GHR_OK;
+
+    switch(type) {
+    case LUA_TNUMBER: {
+        gh_variant * param;
+        res = gh_fdmem_new(mem, sizeof(gh_variant), (void**)&param);
+        if (ghr_iserr(res)) return res;
+
+        *out_virtptr = gh_fdmem_virtptr(mem, param, sizeof(gh_variant));
+        if (*out_virtptr == 0) return GHR_JAIL_LUACALLRETURN;
+
+        param->type = GH_VARIANT_DOUBLE;
+        param->t_double = (double)lua_tonumber(L, -1);
+        break;
+    }
+
+    case LUA_TSTRING: {
+        size_t len;
+        const char * str = lua_tolstring(L, -1, &len);
+
+        gh_variant * param;
+        res = gh_fdmem_new(mem, sizeof(gh_variant) + len + 1, (void**)&param);
+        if (ghr_iserr(res)) return res;
+
+        *out_virtptr = gh_fdmem_virtptr(mem, param, sizeof(gh_variant) + len + 1);
+        if (*out_virtptr == 0) return GHR_JAIL_LUACALLRETURN;
+
+        param->type = GH_VARIANT_STRING;
+
+        param->t_string_len = len;
+        strncpy(param->t_string_data, str, len);
+        param->t_string_data[len] = '\0';
+        break;
+    }
+
+    default:
+    case LUA_TNIL: {
+        gh_variant * param;
+        res = gh_fdmem_new(mem, sizeof(gh_variant), (void**)&param);
+        if (ghr_iserr(res)) return res;
+
+        *out_virtptr = gh_fdmem_virtptr(mem, param, sizeof(gh_variant));
+        if (*out_virtptr == 0) return GHR_UNKNOWN;
+
+        param->type = GH_VARIANT_NIL;
+        break;
+    }
+    }
+
+    return res;
+}
+
+static gh_result lua_callfunction(gh_ipc * ipc, gh_ipcmsg_luacall * msg) {
+    int script_id;
+    gh_result inner_res = GHR_OK;
+    gh_result ipcfdmem_dtor_res = GHR_OK;
+
+    gh_result res = lua_sendinfomsg(ipc, &script_id);
+    if (ghr_iserr(res)) return res;
+
+    gh_fdmem mem;
+    res = gh_fdmem_ctorfdo(&mem, msg->ipcfdmem_fd, msg->ipcfdmem_occupied);
+    if (ghr_iserr(res)) return res;
+    
+    int prev_top = lua_gettop(L);
+
+    gh_fdmem_ptr return_ptr = 0;
+
+    lua_getglobal(L, "callbacks");
+    if (lua_type(L, -1) == LUA_TNIL) {
+        res = GHR_JAIL_LUACALLMISSING;
+        goto respond;
+    }
+
+    lua_getfield(L, -1, msg->name);
+    if (lua_type(L, -1) == LUA_TNIL) {
+        res = GHR_JAIL_LUACALLMISSING;
+        goto respond;
+    }
+
+    int nargs = 0;
+    for (size_t i = 0; i < GH_IPCMSG_LUACALL_MAXPARAMS; i++) {
+        gh_fdmem_ptr param_ptr = msg->params[i];
+        if (param_ptr == 0) break;
+
+        gh_variant * param = (gh_variant *)gh_fdmem_realptr(&mem, param_ptr, 1);
+        if (param == NULL) {
+            res = GHR_JAIL_LUACALLPARAM;
+            goto respond;
+        }
+
+        res = lua_callfunction_pushparam(ipc, &mem, param);
+        if (ghr_iserr(res)) goto respond;
+
+        nargs += 1;
+    }
+
+    int r = gh_lua_pcall(L, nargs, 1);
+    if (r != 0) {
+        res = lua_poperror(r);
+        goto respond;
+    }
+
+    res = lua_callfunction_getreturn(ipc, &mem, &return_ptr);
+    if (ghr_iserr(res)) {
+        goto respond;
+    }
+
+respond:
+    lua_settop(L, prev_top);
+
+    gh_ipcmsg_luaresult result_msg = {
+        .type = GH_IPCMSG_LUARESULT,
+        .result = res,
+        .script_id = script_id,
+        .error_msg = {0},
+        
+        .return_ptr = return_ptr
+    };
+
+    ipcfdmem_dtor_res = gh_fdmem_dtor(&mem);
+
+    inner_res = gh_ipc_send(ipc, (gh_ipcmsg *)&result_msg, sizeof(gh_ipcmsg_luaresult));
+    if (ghr_iserr(inner_res)) return inner_res;
+    if (ghr_iserr(ipcfdmem_dtor_res)) return ipcfdmem_dtor_res;
+
+    return res;
+}
+
 static bool message_recv(gh_ipc * ipc, gh_ipcmsg * msg) {
     (void)ipc;
 
@@ -171,9 +395,24 @@ static bool message_recv(gh_ipc * ipc, gh_ipcmsg * msg) {
         return false;
     }
 
-    case GH_IPCMSG_KILLSUBJAIL: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
-    case GH_IPCMSG_SUBJAILDEAD: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
-        
+    case GH_IPCMSG_LUAHOSTVARIABLE: {
+        gh_ipcmsg_luahostvariable * global_msg = (gh_ipcmsg_luahostvariable *)msg;
+        fprintf(stderr, "subjail %d: setting lua host variable '%s'\n", gh_global_subjail_idx, global_msg->name);
+        ghr_assert(lua_sethostvariable(ipc, global_msg));
+        fprintf(stderr, "subjail %d: finished setting lua host variable '%s'\n", gh_global_subjail_idx, global_msg->name);
+
+        return false;
+    }
+
+    case GH_IPCMSG_LUACALL: {
+        gh_ipcmsg_luacall * call_msg = (gh_ipcmsg_luacall *)msg;
+        fprintf(stderr, "subjail %d: calling lua function '%s'\n", gh_global_subjail_idx, call_msg->name);
+        ghr_assert(lua_callfunction(ipc, call_msg));
+        fprintf(stderr, "subjail %d: finished calling lua function '%s'\n", gh_global_subjail_idx, call_msg->name);
+
+        return false;
+    }
+
     case GH_IPCMSG_LUAINFO: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
     case GH_IPCMSG_LUARESULT: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
 

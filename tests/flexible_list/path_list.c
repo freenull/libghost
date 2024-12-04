@@ -1,5 +1,5 @@
 #include <ghost/alloc.h>
-#include <ghost/variable_list.h>
+#include <ghost/flexible_list.h>
 #include <string.h>
 
 typedef struct {

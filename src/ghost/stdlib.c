@@ -4,6 +4,7 @@
 #include <time.h>
 #include <ghost/stdlib.h>
 #include <ghost/rpc.h>
+#include <ghost/perms/perms.h>
 #include <ghost/perms/pathfd.h>
 #include <ghost/perms/procfd.h>
 #include <ghost/result.h>
@@ -21,7 +22,7 @@ gh_result gh_std_openat(gh_thread * thread, int dirfd, const char * path, int fl
     res = gh_permfs_fcntlflags2permfsmode(flags, create_mode, pathfd, &mode);
     if (ghr_iserr(res)) goto close_pathfd;
 
-    res = gh_perms_actfilesystem(thread, pathfd, mode, NULL);
+    res = gh_perms_gatefile(thread, pathfd, mode, NULL);
     if (ghr_iserr(res)) goto close_pathfd;
 
     int new_fd = -1;
@@ -78,7 +79,7 @@ gh_result gh_std_unlinkat(gh_thread * thread, int dirfd, const char * path) {
 
     gh_permfs_mode mode = GH_PERMFS_UNLINK;
 
-    res = gh_perms_actfilesystem(thread, pathfd, mode, NULL);
+    res = gh_perms_gatefile(thread, pathfd, mode, NULL);
     if (ghr_iserr(res)) goto close_pathfd;
 
     if (unlinkat(pathfd.fd, pathfd.trailing_name, 0) < 0) {
@@ -152,7 +153,7 @@ gh_result gh_std_opentemp(gh_thread * thread, const char * prefix, int flags, st
     res = gh_permfs_fcntlflags2permfsmode(flags, 0644, pathfd, &mode);
     if (ghr_iserr(res)) goto err_close_fd;
 
-    res = gh_perms_actfilesystem(thread, pathfd, mode, "tmpfile");
+    res = gh_perms_gatefile(thread, pathfd, mode, "tmpfile");
     if (ghr_iserr(res)) goto err_close_fd;
 
     gh_abscanonicalpath path;
@@ -208,6 +209,91 @@ static void ghost_opentemp(gh_rpc * rpc, gh_rpcframe * frame) {
     gh_rpcframe_returnbuftypedhere(frame, tempfile.path, strlen(tempfile.path))
 }
 
+gh_result gh_std_fsrequest(gh_thread * thread, int dirfd, const char * path, gh_permfs_mode self_mode, gh_permfs_mode children_mode, bool * out_wouldprompt) {
+    gh_result res = GHR_OK;
+    gh_result inner_res = GHR_OK;
+
+    if (!gh_permfs_ismodevalid(self_mode)) return GHR_STD_INVALIDMODE;
+    if (!gh_permfs_ismodevalid(children_mode)) return GHR_STD_INVALIDMODE;
+
+    if (self_mode == children_mode && self_mode == GH_PERMFS_NONE) return GHR_STD_INVALIDMODE;
+
+    gh_pathfd pathfd = {0};
+    res = gh_pathfd_open(dirfd, path, &pathfd);
+    if (ghr_iserr(res)) return res;
+
+    res = gh_perms_fsrequest(thread, pathfd, self_mode, children_mode, "future", out_wouldprompt);
+    if (ghr_iserr(res)) goto close_pathfd;
+
+close_pathfd:
+    inner_res = gh_pathfd_close(pathfd);
+    if (ghr_iserr(inner_res)) res = inner_res;
+
+    return res;
+}
+
+static void ghost_fsrequest(gh_rpc * rpc, gh_rpcframe * frame) {
+    (void)rpc;
+
+    char * path_buf;
+    size_t path_size;
+    if (!gh_rpcframe_argbuf(frame, 0, &path_buf, &path_size)) {
+        gh_rpcframe_failhere(frame, ghr_errnoval(GHR_RPCF_ARG0, EINVAL));
+    }
+
+    if (path_size > INT_MAX) gh_rpcframe_failhere(frame, ghr_errnoval(GHR_RPCF_ARG0, EFBIG));
+    path_buf[path_size - 1] = '\0';
+
+    gh_permfs_mode * self_mode;
+    if (!gh_rpcframe_arg(frame, 1, &self_mode)) {
+        gh_rpcframe_failhere(frame, ghr_errnoval(GHR_RPCF_ARG1, EINVAL));
+    }
+
+    gh_permfs_mode * children_mode;
+    if (!gh_rpcframe_arg(frame, 2, &children_mode)) {
+        gh_rpcframe_failhere(frame, ghr_errnoval(GHR_RPCF_ARG2, EINVAL));
+    }
+
+    gh_result res = gh_std_fsrequest(frame->thread, AT_FDCWD, path_buf, *self_mode, *children_mode, NULL);
+
+    if (ghr_iserr(res)) {
+        gh_rpcframe_failhere(frame, res);
+    }
+}
+
+static void ghost_fshas(gh_rpc * rpc, gh_rpcframe * frame) {
+    (void)rpc;
+
+    char * path_buf;
+    size_t path_size;
+    if (!gh_rpcframe_argbuf(frame, 0, &path_buf, &path_size)) {
+        gh_rpcframe_failhere(frame, ghr_errnoval(GHR_RPCF_ARG0, EINVAL));
+    }
+
+    if (path_size > INT_MAX) gh_rpcframe_failhere(frame, ghr_errnoval(GHR_RPCF_ARG0, EFBIG));
+    path_buf[path_size - 1] = '\0';
+
+    gh_permfs_mode * self_mode;
+    if (!gh_rpcframe_arg(frame, 1, &self_mode)) {
+        gh_rpcframe_failhere(frame, ghr_errnoval(GHR_RPCF_ARG1, EINVAL));
+    }
+
+    gh_permfs_mode * children_mode;
+    if (!gh_rpcframe_arg(frame, 2, &children_mode)) {
+        gh_rpcframe_failhere(frame, ghr_errnoval(GHR_RPCF_ARG2, EINVAL));
+    }
+
+    bool would_prompt = false;
+    gh_result res = gh_std_fsrequest(frame->thread, AT_FDCWD, path_buf, *self_mode, *children_mode, &would_prompt);
+
+    if (ghr_iserr(res)) {
+        gh_rpcframe_failhere(frame, res);
+    }
+
+    bool has_perms = !would_prompt;
+    gh_rpcframe_returntypedhere(frame, &has_perms);
+}
+
 gh_result gh_std_registerinrpc(gh_rpc * rpc) {
     gh_result res;
 
@@ -218,6 +304,12 @@ gh_result gh_std_registerinrpc(gh_rpc * rpc) {
     if (ghr_iserr(res)) return res;
 
     res = gh_rpc_register(rpc, "ghost.remove", ghost_remove, GH_RPCFUNCTION_THREADSAFE);
+    if (ghr_iserr(res)) return res;
+
+    res = gh_rpc_register(rpc, "ghost.perm.fsrequest", ghost_fsrequest, GH_RPCFUNCTION_THREADSAFE);
+    if (ghr_iserr(res)) return res;
+
+    res = gh_rpc_register(rpc, "ghost.perm.fshas", ghost_fshas, GH_RPCFUNCTION_THREADSAFE);
     if (ghr_iserr(res)) return res;
 
     return res;

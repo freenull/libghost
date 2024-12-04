@@ -1,4 +1,8 @@
+#define _GNU_SOURCE
+#include <fcntl.h>
+#include <sys/mman.h>
 #include <signal.h>
+#include <execinfo.h>
 #include <poll.h>
 #include <sys/poll.h>
 #include <unistd.h>
@@ -7,8 +11,11 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/types.h>
+#include <ghost/alloc.h>
 #include <ghost/result.h>
+#include <ghost/fdmem.h>
 #include <ghost/ipc.h>
+#include <ghost/byte_buffer.h>
 
 gh_result gh_ipc_ctor(gh_ipc * ipc, int * out_peerfd) {
     int fds[2];
@@ -50,6 +57,9 @@ static gh_result prepare_cmsg(gh_ipc * ipc, gh_ipcmsg * msg, struct msghdr * msg
         required = false;
     } else if (msg->type == GH_IPCMSG_LUAFILE) {
         fd = &((gh_ipcmsg_luafile *)msg)->fd;
+        required = true;
+    } else if (msg->type == GH_IPCMSG_LUACALL) {
+        fd = &((gh_ipcmsg_luacall *)msg)->ipcfdmem_fd;
         required = true;
     }
 
@@ -186,7 +196,9 @@ gh_result gh_ipc_recv(gh_ipc * ipc, gh_ipcmsg * msg, int timeout_ms) {
 
     ssize_t recv_size = recvmsg(ipc->sockfd, &msgh, 0);
     if (recv_size < 0) return ghr_errno(GHR_IPC_RECVMSGFAIL);
-    if (recv_size == 0) return ghr_errno(GHR_IPC_PEERSHUTDOWN);
+    if (recv_size == 0) {
+        return GHR_IPC_PEERSHUTDOWN;
+    }
 
     bool msg_trunc = (msgh.msg_flags & MSG_TRUNC) != 0;
     if (msg_trunc) return GHR_IPC_RECVMSGTRUNC;

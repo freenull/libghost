@@ -1,8 +1,19 @@
+/** @defgroup alloc Allocators
+ *
+ * @brief Generic allocator interface.
+ *
+ * @{
+ */
+
 #ifndef GHOST_ALLOC_H
 #define GHOST_ALLOC_H
 
 #include <stdlib.h>
 #include <ghost/result.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef gh_result gh_alloc_func(void ** ptr, size_t old_size, size_t new_size, void * userdata);
 
@@ -24,4 +35,10 @@ gh_result gh_alloc_new(gh_alloc * alloc, void ** out_ptr, size_t size);
 gh_result gh_alloc_delete(gh_alloc * alloc, void ** ptr, size_t old_size);
 gh_result gh_alloc_resize(gh_alloc * alloc, void ** out_ptr, size_t old_size, size_t new_size);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif
+
+/** @} */

@@ -1,8 +1,19 @@
+/** @defgroup byte_buffer Byte buffers
+ *
+ * @brief Dynamically resizable buffer. Like an allocator, but made for building strings and contiguous data structures.
+ *
+ * @{
+ */
+
 #ifndef GHOST_BYTEBUFFER_H
 #define GHOST_BYTEBUFFER_H
 
 #include <ghost/result.h>
 #include <ghost/alloc.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define GH_BYTEBUFFER_INITIALCAPACITY 1024
 #define GH_BYTEBUFFER_MAXCAPACITY GH_DYNAMICARRAY_NOMAXCAPACITY
@@ -20,4 +31,10 @@ gh_result gh_bytebuffer_expand(gh_bytebuffer * buffer, size_t size, char ** out_
 gh_result gh_bytebuffer_clear(gh_bytebuffer * buffer);
 gh_result gh_bytebuffer_dtor(gh_bytebuffer * buffer);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif
+
+/** @} */

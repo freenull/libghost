@@ -49,7 +49,7 @@ gh_result gh_pathfd_opentrailing(int dirfd, const char * path, gh_pathfd * out_p
 gh_result gh_pathfd_open(int dirfd, const char * path, gh_pathfd * out_pathfd) {
     memset(out_pathfd->trailing_name, 0, GH_PATHFD_TRAILINGNAMEMAX * sizeof(char));
 
-    int opath_fd = openat(dirfd, path, O_PATH, 0);
+    int opath_fd = openat(dirfd, path, O_PATH | O_NOFOLLOW, 0);
     if (opath_fd < 0) {
         if (errno == ENOENT) {
             return gh_pathfd_opentrailing(dirfd, path, out_pathfd);
@@ -62,7 +62,14 @@ gh_result gh_pathfd_open(int dirfd, const char * path, gh_pathfd * out_pathfd) {
     return GHR_OK;
 }
 
-bool gh_pathfd_exists(gh_pathfd pathfd) {
+gh_result gh_pathfd_stat(gh_pathfd pathfd, struct stat * out_statbuf) {
+    if (!gh_pathfd_guaranteedtoexist(pathfd)) return GHR_PATHFD_MAYNOTEXIST;
+
+    if (fstat(pathfd.fd, out_statbuf) < 0) return ghr_errno(GHR_PATHFD_STATFAIL);
+    return GHR_OK;
+}
+
+bool gh_pathfd_guaranteedtoexist(gh_pathfd pathfd) {
     return pathfd.trailing_name[0] == '\0';
 }
 

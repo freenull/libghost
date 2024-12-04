@@ -2,15 +2,15 @@ EnumKey,Ident,Value,Description
 NONE,none,0,None
 CREATEFILE,createfile,::,Create the file
 CREATEDIR,createdir,::,Create the directory
-ACCESS_USER_READ,access.u+r,::,"The owner (you) will be able to read the file"
-ACCESS_USER_WRITE,access.u+w,::,"The owner (you) will be able to write to the file"
-ACCESS_USER_EXECUTE,access.u+x,::,"The owner (you) will be able to execute the file"
-ACCESS_GROUP_READ,access.g+r,::,"Everybody in the group will be able to read the file"
-ACCESS_GROUP_WRITE,access.g+w,::,"Everybody in the group will be able to write to the file"
-ACCESS_GROUP_EXECUTE,access.g+x,::,"Everybody in the group will be able to execute the file"
-ACCESS_OTHER_READ,access.o+r,::,"Everyone on the system will be able to read the file"
-ACCESS_OTHER_WRITE,access.o+w,::,"Everyone on the system will be able to write to the file"
-ACCESS_OTHER_EXECUTE,access.o+x,::,"Everyone on the system will be able to execute the file"
+ACCESS_USER_READ,access.u+r,::,Configure created files and directories to be readable by the owner (you)
+ACCESS_USER_WRITE,access.u+w,::,Configure created files and directories to be writable by the owner (you)
+ACCESS_USER_EXECUTE,access.u+x,::,Configure created files and directories to be executable by the owner (you)
+ACCESS_GROUP_READ,access.g+r,::,Configure created files and directories to be readable by your user group
+ACCESS_GROUP_WRITE,access.g+w,::,Configure created files and directories to be writable by your user group
+ACCESS_GROUP_EXECUTE,access.g+x,::,Configure created files and directories to be executable by your user group
+ACCESS_OTHER_READ,access.o+r,::,Configure created files and directories to be readable by everybody on the system
+ACCESS_OTHER_WRITE,access.o+w,::,Configure created files and directories to be writable by everybody on the system
+ACCESS_OTHER_EXECUTE,access.o+x,::,Configure created files and directories to be executable by everybody on the system
 READ,read,::,Read the contents of the file
 WRITE,write,::,Write to the file
 UNLINK,unlink,::,Remove the file or empty directory

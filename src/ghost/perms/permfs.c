@@ -1,3 +1,4 @@
+#include "ghost/strings.h"
 #define _GNU_SOURCE
 #include <string.h>
 #include <sys/stat.h>
@@ -5,6 +6,7 @@
 #include <ghost/dynamic_array.h>
 #include <ghost/perms/permfs.h>
 #include <ghost/perms/parser.h>
+#include <ghost/thread.h>
 
 bool gh_permfs_nextmodeflag(gh_permfs_mode * state, gh_permfs_mode * out_flag) {
     if (*state == 0) return false;
@@ -21,10 +23,35 @@ bool gh_permfs_nextmodeflag(gh_permfs_mode * state, gh_permfs_mode * out_flag) {
     return true;
 }
 
+bool gh_permfs_ismodevalid(gh_permfs_mode mode) {
+    return mode <= GH_PERMFS_ALLFLAGS;
+}
+
+gh_result gh_permfs_mode_fromstr(gh_conststr str, gh_permfs_mode * out_mode) {
+    char str_copy[str.size + 1];
+    strncpy(str_copy, str.buffer, str.size);
+    str_copy[str.size] = '\0';
+
+    *out_mode = GH_PERMFS_NONE;
+
+    char * strtok_saveptr = NULL;
+    char * s = strtok_r(str_copy, ",", &strtok_saveptr);
+    while (s != NULL) {
+        gh_permfs_mode flag = gh_permfs_mode_fromident(s);
+        if (flag == GH_PERMFS_NONE) return ghr_errnoval(GHR_PERMFS_UNKNOWNMODE, EINVAL);
+
+        *out_mode |= flag;
+
+        s = strtok_r(NULL, ",", &strtok_saveptr);
+    }
+
+    return GHR_OK;
+}
+
 static gh_result permfsfilelist_dtorelement(gh_dynamicarray da, void * elem_voidp, void * userdata) {
     (void)userdata;
     gh_permfs_entry * entry = (gh_permfs_entry *)elem_voidp;
-    return gh_alloc_delete(da.alloc, (void**)&entry->ident.path.ptr, (entry->ident.path.len + 1) * sizeof(char));
+    return gh_alloc_delete(da.alloc, (void**)(void*)&entry->ident.path.ptr, (entry->ident.path.len + 1) * sizeof(char));
 }
 
 static const gh_dynamicarrayoptions permfsfilelist_daopts = {
@@ -55,8 +82,7 @@ gh_result gh_permfs_entrylist_dtor(gh_permfs_entrylist * list) {
     return gh_dynamicarray_dtor(GH_DYNAMICARRAY(list), &permfsfilelist_daopts);
 }
 
-gh_result gh_permfs_ctor(gh_permfs * permfs, gh_alloc * alloc, gh_permaction default_action) {
-    permfs->default_action = default_action;
+gh_result gh_permfs_ctor(gh_permfs * permfs, gh_alloc * alloc) {
     gh_result res = gh_permfs_entrylist_ctor(&permfs->file_perms, alloc);
     if (ghr_iserr(res)) return res;
 
@@ -73,9 +99,13 @@ static gh_result permfs_appendentry(gh_permfs * permfs, gh_permfs_ident ident, g
     file_perm.ident.path.len = 0;
     file_perm.ident.path.ptr = NULL;
 
-    gh_result res = gh_alloc_new(permfs->file_perms.alloc, (void**)&file_perm.ident.path.ptr, (ident.path.len + 1) * sizeof(char));
+    gh_result res = gh_alloc_new(permfs->file_perms.alloc, (void**)(void*)&file_perm.ident.path.ptr, (ident.path.len + 1) * sizeof(char));
     if (ghr_iserr(res)) return res;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wincompatible-pointer-types-discards-qualifiers"
+    // RATIONALE: This constructs the path. The memory for it was just allocated.
     strncpy(file_perm.ident.path.ptr, ident.path.ptr, ident.path.len + 1);
+#pragma clang diagnostic pop
     file_perm.ident.path.len = ident.path.len;
 
     res = gh_permfs_entrylist_append(&permfs->file_perms, file_perm);
@@ -120,7 +150,7 @@ inline static bool file_type_allowed(mode_t mode) {
     return S_ISREG(mode) || S_ISDIR(mode) || S_ISLNK(mode);
 }
 
-gh_result gh_permfs_getmode(gh_permfs * permfs, int opath_fd, gh_abscanonicalpath canonical_path, gh_permfs_modeset * out_modeset) {
+gh_result gh_permfs_getmode(gh_permfs * permfs, int opath_fd, gh_abscanonicalpath canonical_path, gh_permfs_modeset * out_self_modeset, gh_permfs_modeset * out_children_modeset) {
     struct stat stat;
     int fstat_result = fstat(opath_fd, &stat);
     bool exists = false;
@@ -132,12 +162,10 @@ gh_result gh_permfs_getmode(gh_permfs * permfs, int opath_fd, gh_abscanonicalpat
 
     if (exists && !file_type_allowed(stat.st_mode)) return GHR_PERMFS_BADTYPE;
 
-    /* gh_abscanonicalpath path; */
-    /* gh_result res = gh_procfd_fdpathctor(&permfs->procfd, fd, &path); */
-    /* if (ghr_iserr(res)) return res; */
-
     gh_result res = GHR_OK;
-    gh_permfs_modeset mode = {0};
+    gh_permfs_modeset self_modeset = {0};
+    gh_permfs_modeset children_modeset = {0};
+
     for (size_t i = 0; i < permfs->file_perms.size; i++) {
         gh_permfs_entry * perm = NULL;
         res = gh_permfs_entrylist_getat(&permfs->file_perms, i, &perm);
@@ -145,7 +173,8 @@ gh_result gh_permfs_getmode(gh_permfs * permfs, int opath_fd, gh_abscanonicalpat
 
         // exact match - for when the exact file path is in the permfsentrylist
         if (strncmp(perm->ident.path.ptr, canonical_path.ptr, canonical_path.len + 1) == 0) {
-            mode = gh_permfs_modeset_join(mode, perm->self);
+            self_modeset = gh_permfs_modeset_join(self_modeset, perm->self);
+            children_modeset = gh_permfs_modeset_join(children_modeset, perm->children);
             continue;
         }
 
@@ -157,19 +186,20 @@ gh_result gh_permfs_getmode(gh_permfs * permfs, int opath_fd, gh_abscanonicalpat
 
         if (canonical_path.ptr[perm->ident.path.len] != '/') continue;
 
-        mode = gh_permfs_modeset_join(mode, perm->children);
+        self_modeset = gh_permfs_modeset_join(self_modeset, perm->children);
+        children_modeset = gh_permfs_modeset_join(self_modeset, perm->children);
     }
 
-    if (out_modeset != NULL) *out_modeset = mode;
+    if (out_self_modeset != NULL) *out_self_modeset = self_modeset;
+    if (out_children_modeset != NULL) *out_children_modeset = children_modeset;
     return GHR_OK;
 }
 
-gh_result gh_permfs_act(gh_permfs * permfs, gh_permfs_modeset modeset, gh_permfs_mode mode, gh_permfs_actionresult * out_result) {
+static gh_result permfs_actmode(gh_permfs * permfs, gh_permfs_modeset modeset, gh_permfs_mode mode, gh_permfs_actionresult * out_result) {
     (void)permfs;
 
     if ((modeset.mode_reject & mode) != 0) {
         if (out_result != NULL) {
-            out_result->action = GH_PERMACTION_REJECT;
             out_result->rejected_mode = mode & (~modeset.mode_reject);
             out_result->default_policy = false;
         }
@@ -177,104 +207,110 @@ gh_result gh_permfs_act(gh_permfs * permfs, gh_permfs_modeset modeset, gh_permfs
         return GHR_PERMS_REJECTEDPOLICY;
     }
 
-    if ((modeset.mode_accept & mode) == mode) {
-        if (out_result != NULL) {
-            out_result->action = GH_PERMACTION_ACCEPT;
-            out_result->rejected_mode = 0;
-            out_result->default_policy = false;
+    gh_permfs_mode accepted_mode = modeset.mode_accept & mode;
+    if (accepted_mode != 0) {
+        if (accepted_mode == mode) {
+            if (out_result != NULL) {
+                out_result->rejected_mode = 0;
+                out_result->default_policy = false;
+            }
+            return GHR_OK;
+        } else {
+            mode = mode & ~(accepted_mode);
         }
-        return GHR_OK;
     }
 
 
     if ((modeset.mode_prompt & mode) != 0) {
         if (out_result != NULL) {
-            out_result->action = GH_PERMACTION_PROMPT;
             out_result->rejected_mode = modeset.mode_prompt;
             out_result->default_policy = false;
         }
         return GHR_PERMS_REJECTEDPROMPT;
     }
 
-    gh_permaction action = permfs->default_action;
-    if (action != GH_PERMACTION_ACCEPT
-    && action != GH_PERMACTION_REJECT
-    && action != GH_PERMACTION_PROMPT) {
-        action = GH_PERMACTION_REJECT;
-    }
-
     if (out_result != NULL) {
-        out_result->action = action;
         out_result->rejected_mode = mode;
         out_result->default_policy = true;
     }
-
-    switch(action) {
-    case GH_PERMACTION_PROMPT: return GHR_PERMS_REJECTEDPROMPT;
-    case GH_PERMACTION_REJECT: return GHR_PERMS_REJECTEDPOLICY;
-    case GH_PERMACTION_ACCEPT: return GHR_OK;
-    default: return GHR_PERMS_REJECTEDPOLICY;
-    }
+    return GHR_PERMS_REJECTEDPROMPT;
 }
 
-static const gh_permrequest permfs_reqtemplate = {
-    .group = "filesystem",
-    .resource = "node",
-    .fields = {
-        { .key = "path" },
-        { .key = "mode_self" }
-    },
-};
+static bool permfs_buildreqdescription(gh_str * str, gh_permfs_mode self_mode, gh_permfs_mode children_mode) {
+    if (!gh_str_appendz(str, "Source '${source}' is requesting access to the ${node_type} at ${key}.", true)) return false;
 
-static gh_result permfs_mode_fill(gh_bytebuffer * buffer, gh_permfs_mode mode) {
-    gh_result res = GHR_OK;
+    if (self_mode != GH_PERMFS_NONE) {
+        const char * s = "$$If you accept, the script will be able to do the following with the ${node_type} at ${key}:";
+        if (!gh_str_appendz(str, s, true)) return false;
 
-    bool first = true;
-    for (size_t i = 0; i < sizeof(gh_permfs_mode) * 8; i++) {
-        gh_permfs_mode flag = mode & (1 << i);
-        if (flag == 0) continue;
+        gh_permfs_mode iter = self_mode;
+        gh_permfs_mode flag;
+        while (gh_permfs_nextmodeflag(&iter, &flag)) {
+            if (!gh_str_appendz(str, "$$ - ", false)) return false;
 
-        const char * flagstr = gh_permfs_mode_ident(flag);
-        if (flagstr == NULL) continue;
-
-        if (!first) {
-            res = gh_bytebuffer_append(buffer, ",", 1);
-            if (ghr_iserr(res)) return res;
+            const char * desc = gh_permfs_mode_desc(flag);
+            if (!gh_str_appendz(str, desc, true)) return false;
         }
-        first = false;
-
-        res = gh_bytebuffer_append(buffer, flagstr, strlen(flagstr));
-        if (ghr_iserr(res)) return res;
     }
 
-    return GHR_OK;
+    if (children_mode != GH_PERMFS_NONE) {
+        if (str->size > 0) {
+            if (!gh_str_appendz(str, "$$", false)) return false;
+        }
+
+        const char * s = "If you accept, the script will be able to do the following with ANY files and directories inside the ${node_type} at ${key}:";
+        if (!gh_str_appendz(str, s, true)) return false;
+
+        gh_permfs_mode iter = children_mode;
+        gh_permfs_mode flag;
+        while (gh_permfs_nextmodeflag(&iter, &flag)) {
+            if (!gh_str_appendz(str, "$$- ", false)) return false;
+
+            const char * desc = gh_permfs_mode_desc(flag);
+            if (!gh_str_appendz(str, desc, true)) return false;
+        }
+    }
+
+    gh_str_insertnull(str);
+    return true;
 }
 
-gh_result gh_permfs_reqctor(gh_permfs * permfs, const char * source, gh_abscanonicalpath path, const char * hint, gh_permfs_actionresult * result, gh_permfs_reqdata * out_reqdata) {
-    gh_result inner_res = GHR_OK;
+static gh_result permfs_makerequest(const char * source, gh_abscanonicalpath path, const char * node_type, const char * hint, gh_permfs_mode self_mode, gh_permfs_mode children_mode, gh_permfs_reqdata * out_reqdata) {
+    gh_str description_buffer = gh_str_fromc(out_reqdata->description_buffer, 0, sizeof(out_reqdata->description_buffer));
+    if (!permfs_buildreqdescription(&description_buffer, self_mode, children_mode)) {
+        return GHR_PERMFS_LARGEDESCRIPTION;
+    }
 
-    gh_bytebuffer buf;
-    gh_result res = gh_bytebuffer_ctor(&buf, permfs->file_perms.alloc);
-    if (ghr_iserr(res)) return res;
+    out_reqdata->request = (gh_permrequest) {0};
 
-    res = permfs_mode_fill(&buf, result->rejected_mode);
-    if (ghr_iserr(res)) goto err_fill;
+    strcpy(out_reqdata->request.group, "filesystem");
+    strcpy(out_reqdata->request.resource, "node");
 
-    res = gh_bytebuffer_append(&buf, "\0", 1);
-    if (ghr_iserr(res)) goto err_append;
-    
-    out_reqdata->request = permfs_reqtemplate;
-    out_reqdata->request.fields[0].value = path.ptr;
-    out_reqdata->request.fields[0].value_len = path.len;
+    strcpy(out_reqdata->request.fields[0].key, "key");
+    out_reqdata->request.fields[0].value.buffer = path.ptr;
+    out_reqdata->request.fields[0].value.size = path.len;
+
+    strcpy(out_reqdata->request.fields[1].key, "description");
+    out_reqdata->request.fields[1].value.buffer = description_buffer.buffer;
+    out_reqdata->request.fields[1].value.size = description_buffer.size;
 
     strcpy(out_reqdata->request.source, source);
-    out_reqdata->request.fields[1].value = buf.buffer;
-    out_reqdata->request.fields[1].value_len = buf.size - 1;
+
+    int field_idx = 2;
+
+    if (node_type == NULL) {
+        node_type = "filesystem node";
+    }
+
+    strcpy(out_reqdata->request.fields[field_idx].key, "node_type");
+    out_reqdata->request.fields[field_idx].value.buffer = node_type;
+    out_reqdata->request.fields[field_idx].value.size = strlen(node_type);
+    field_idx += 1;
 
     if (hint != NULL) {
-        strcpy(out_reqdata->request.fields[2].key, "hint");
-        out_reqdata->request.fields[2].value = hint;
-        out_reqdata->request.fields[2].value_len = strlen(hint);
+        strcpy(out_reqdata->request.fields[field_idx].key, "hint");
+        out_reqdata->request.fields[field_idx].value.buffer = hint;
+        out_reqdata->request.fields[field_idx].value.size = strlen(hint);
     }
 
     // request/rejected_mode-based requests will NEVER have the mode_children field,
@@ -282,27 +318,209 @@ gh_result gh_permfs_reqctor(gh_permfs * permfs, const char * source, gh_abscanon
     // permissions
 
     out_reqdata->path = path;
-    out_reqdata->buffer = buf;
     goto success;
-
-err_fill:
-err_append:
-    inner_res = gh_bytebuffer_dtor(&buf);
-    if (ghr_iserr(inner_res)) res = inner_res;
-
-    return res;
 
 success:
     return GHR_OK;
 }
 
-gh_result gh_permfs_reqdtor(gh_permfs * permfs, gh_permfs_reqdata * reqdata) {
-    (void)permfs;
+static gh_result permfs_promptrequest(gh_permfs * permfs, gh_permprompter * prompter, const char * safe_id, gh_abscanonicalpath canonical_path, const char * node_type, const char * hint, gh_permfs_mode self_mode, gh_permfs_mode children_mode) {
+    gh_result res = GHR_OK;
 
-    gh_result res = gh_bytebuffer_dtor(&reqdata->buffer);
+    gh_permfs_reqdata reqdata;
+    res = permfs_makerequest(
+        safe_id,
+        canonical_path, node_type,
+        hint,
+        self_mode, children_mode,
+        &reqdata
+    );
     if (ghr_iserr(res)) return res;
 
-    return GHR_OK;
+    gh_permresponse resp;
+    res = gh_permprompter_request(prompter, &reqdata.request, &resp);
+    if (ghr_iserr(res)) return res;
+
+    switch(resp) {
+    case GH_PERMRESPONSE_ACCEPT:
+        break;
+
+    case GH_PERMRESPONSE_REJECT:
+        res = GHR_PERMS_REJECTEDUSER;
+        break;
+
+    case GH_PERMRESPONSE_ACCEPTREMEMBER:
+        res = gh_permfs_add(
+            permfs,
+            (gh_permfs_ident) {
+                .path = canonical_path
+            },
+            (gh_permfs_modeset){
+                .mode_accept = self_mode
+            },
+            (gh_permfs_modeset){
+                .mode_accept = children_mode
+            },
+            NULL
+        );
+        break;
+
+    case GH_PERMRESPONSE_REJECTREMEMBER:
+        res = gh_permfs_add(
+            permfs,
+            (gh_permfs_ident) {
+                .path = canonical_path
+            },
+            (gh_permfs_modeset){
+                .mode_reject = self_mode
+            },
+            (gh_permfs_modeset){
+                .mode_reject = children_mode
+            },
+            NULL
+        );
+        if (ghr_isok(res)) res = GHR_PERMS_REJECTEDUSER;
+        break;
+
+    default:
+        res = GHR_PERMS_REJECTEDPROMPT;
+        break;
+    }
+
+    return res;
+}
+
+static gh_result permfs_getnodetype(gh_pathfd fd, const char ** out_node_type) {
+    *out_node_type = NULL;
+
+    struct stat statbuf;
+    gh_result res = gh_pathfd_stat(fd, &statbuf);
+
+    if (ghr_isok(res)) {
+        if      (S_ISREG(statbuf.st_mode)) *out_node_type = "file";
+        else if (S_ISDIR(statbuf.st_mode)) *out_node_type = "directory";
+        else if (S_ISLNK(statbuf.st_mode)) *out_node_type = "symbolic link";
+        else return GHR_PERMFS_BADTYPE;
+    } else if (ghr_is(res, GHR_PATHFD_MAYNOTEXIST)) {
+        res = GHR_OK;
+    }
+
+    return res;
+}
+
+gh_result gh_permfs_gatefile(gh_permfs * permfs, gh_permprompter * prompter, const char * safe_id, gh_pathfd fd, gh_permfs_mode mode, const char * hint) {
+    gh_result res = GHR_OK;
+    gh_result inner_res = GHR_OK;
+
+    gh_abscanonicalpath canonical_path;
+    res = gh_procfd_fdpathctor(&permfs->procfd, fd, &canonical_path);
+    if (ghr_iserr(res)) return res;
+
+    gh_permfs_modeset modeset = {0};
+    res = gh_permfs_getmode(permfs, fd.fd, canonical_path, &modeset, NULL);
+    if (ghr_iserr(res)) goto dtor_fdpath;
+
+    gh_permfs_actionresult actionres = {0};
+    res = permfs_actmode(permfs, modeset, mode, &actionres);
+
+    if (ghr_is(res, GHR_PERMS_REJECTEDPROMPT)) {
+        const char * node_type;
+        res = permfs_getnodetype(fd, &node_type);
+        if (ghr_iserr(res)) return res;
+
+        res = permfs_promptrequest(permfs, prompter, safe_id, canonical_path, node_type, hint, actionres.rejected_mode, 0);
+    }
+
+dtor_fdpath:
+    inner_res = gh_procfd_fdpathdtor(&permfs->procfd, &canonical_path);
+    if (ghr_iserr(inner_res)) res = inner_res;
+
+    return res;
+}
+
+gh_result gh_permfs_requestnode(gh_permfs * permfs, gh_permprompter * prompter, const char * safe_id, gh_pathfd fd, gh_permfs_mode self_mode, gh_permfs_mode children_mode, const char * hint, bool * out_wouldprompt) {
+    if (out_wouldprompt != NULL) *out_wouldprompt = false;
+
+    gh_result res = GHR_OK;
+    gh_result inner_res = GHR_OK;
+
+    if (self_mode == GH_PERMFS_NONE && children_mode == GH_PERMFS_NONE) {
+        // If both modes are 0, that may indicate a bug. If we show a prompt
+        // with both modes 0, the prompt may fail or show the user a blank
+        // question, which is both confusing and potentially risky.
+        // Because of this, we fail early here.
+        return GHR_PERMFS_NULLREQUEST;
+    }
+
+    gh_abscanonicalpath canonical_path;
+    res = gh_procfd_fdpathctor(&permfs->procfd, fd, &canonical_path);
+    if (ghr_iserr(res)) return res;
+
+    const char * node_type;
+    res = permfs_getnodetype(fd, &node_type);
+    if (ghr_iserr(res)) goto dtor_fdpath;
+
+    gh_permfs_modeset self_modeset = {0};
+    gh_permfs_modeset children_modeset = {0};
+    res = gh_permfs_getmode(permfs, fd.fd, canonical_path, &self_modeset, &children_modeset);
+    if (ghr_iserr(res)) goto dtor_fdpath;
+
+    if (self_mode != GH_PERMFS_NONE) {
+        gh_permfs_actionresult actionres = {0};
+        res = permfs_actmode(permfs, self_modeset, self_mode, &actionres);
+        if (ghr_isok(res)) {
+            // If actmode returned success, that means that all of the mode flags
+            // are already allowed for this entry - we will not prompt for self
+            // flags at all
+            self_mode = GH_PERMFS_NONE;
+        } else if (ghr_is(res, GHR_PERMS_REJECTEDPROMPT)) {
+            // If actmode says we need to prompt for this permission, we just update
+            // the mode to what was rejected (the missing flags) and move on, since
+            // we're about to prompt anyway
+            self_mode = actionres.rejected_mode;
+            res = GHR_OK;
+        } else {
+            // On other errors, including rejection by security policy (i.e. by
+            // 'self reject' specifically), we bail. Scripts cannot prompt for
+            // permissions that have been explicitly rejected forever.
+            goto dtor_fdpath;
+        }
+    }
+
+    if (children_mode != GH_PERMFS_NONE) {
+        // This works exactly like the self_modeset setup above
+        gh_permfs_actionresult actionres = {0};
+        res = permfs_actmode(permfs, children_modeset, children_mode, &actionres);
+        if (ghr_isok(res)) {
+            children_mode = GH_PERMFS_NONE;
+        } else if (ghr_is(res, GHR_PERMS_REJECTEDPROMPT)) {
+            children_mode = actionres.rejected_mode;
+            res = GHR_OK;
+        } else {
+            goto dtor_fdpath;
+        }
+    }
+
+    if (self_mode == GH_PERMFS_NONE && children_mode == GH_PERMFS_NONE) {
+        // If this is true now, that means that both the requested self and children 
+        // modesets are already met. If so, just return without prompting the user.
+        // This is the only condition where requesting permissions succeeds
+        // without actually triggering the prompt.
+        goto dtor_fdpath;
+    }
+
+    // If out_wouldprompt is provided, this is a dry-run and doesn't actually
+    // ask for permissions
+    if (out_wouldprompt != NULL) {
+        *out_wouldprompt = true;
+    } else {
+        res = permfs_promptrequest(permfs, prompter, safe_id, canonical_path, node_type, hint, self_mode, children_mode);
+    }
+
+dtor_fdpath:
+    inner_res = gh_procfd_fdpathdtor(&permfs->procfd, &canonical_path);
+    if (ghr_iserr(inner_res)) res = inner_res;
+    return res;
 }
 
 gh_result gh_permfs_dtor(gh_permfs * permfs) {
@@ -344,7 +562,7 @@ gh_result gh_permfs_fcntlflags2permfsmode(int fcntl_flags, mode_t create_accessm
     if (fcntl_flags & O_CREAT) {
         fcntl_flags = (int)((unsigned int)fcntl_flags & (~((unsigned int)(O_CREAT))));
 
-        if (!gh_pathfd_exists(pathfd)) {
+        if (!gh_pathfd_guaranteedtoexist(pathfd)) {
             permfs_mode = permfs_mode | GH_PERMFS_CREATEFILE;
 
             mode_t cm = 0;
@@ -411,7 +629,7 @@ static gh_result permfsparser_matches(gh_permparser * parser, gh_permrequest_id 
     return GHR_PERMPARSER_NOMATCH;
 }
 
-static gh_result permfsparser_newentry(gh_permparser * parser, gh_str value, void * userdata, void ** out_entry) {
+static gh_result permfsparser_newentry(gh_permparser * parser, gh_conststr value, void * userdata, void ** out_entry) {
     (void)parser;
 
     gh_permfs * permfs = (gh_permfs *)userdata;
@@ -437,23 +655,23 @@ static gh_result permfsparser_setfield(gh_permparser * parser, void * entry_void
     if (gh_str_eqlzrz(field, "self") || gh_str_eqlzrz(field, "children")) {
         gh_permfs_modeset * modeset = gh_str_eqlzrz(field, "self") ? &entry->self : &entry->children;
 
-        gh_str action;
+        gh_conststr action;
         res = gh_permparser_nextidentifier(parser, &action);
         if (ghr_iserr(res)) return res;
 
         gh_permfs_mode * mode = NULL;
-        if (gh_str_eqz(action, "accept")) {
+        if (gh_conststr_eqz(action, "accept")) {
             mode = &modeset->mode_accept;
-        } else if (gh_str_eqz(action, "reject")) {
+        } else if (gh_conststr_eqz(action, "reject")) {
             mode = &modeset->mode_reject;
-        } else if (gh_str_eqz(action, "prompt")) {
+        } else if (gh_conststr_eqz(action, "prompt")) {
             mode = &modeset->mode_prompt;
         } else {
             return gh_permparser_resourceerror(parser, "Unknown action type");
         }
 
         while (true) {
-            gh_str arg;
+            gh_conststr arg;
             res = gh_permparser_nextstring(parser, &arg);
             if (ghr_is(res, GHR_PERMPARSER_EXPECTEDSTRING)) break;
             if (ghr_iserr(res)) return res;

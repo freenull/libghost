@@ -1,3 +1,10 @@
+/** @defgroup typesystem Typesystem
+ *
+ * @brief Dynamic runtime C-like typesystem implementation. Currently not used in libghost.
+ *
+ * @{
+ */
+
 #ifndef GHOST_TYPESYSTEM_H
 #define GHOST_TYPESYSTEM_H
 
@@ -6,6 +13,10 @@
 #include <ghost/result.h>
 #include <ghost/alloc.h>
 #include <ghost/byte_buffer.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define GH_TSTYPE_MAXNAME 256
 #define GH_TSTYPE_MAXFIELDS 32
@@ -117,4 +128,10 @@ gh_result gh_ts_makederivatives(gh_ts * ts);
 
 gh_result gh_ts_loadbuiltin(gh_ts * ts);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif
+
+/** @} */

@@ -1,5 +1,19 @@
+/** @defgroup dynamic_array Dynamic arrays
+ *
+ * @brief Generic dynamic array interface. Implementations provide a set of static options and call functions on a proxy structure containing pointers to the capacity, size and memory buffer.
+ *
+ * @{
+ */
 #ifndef GHOST_DYNAMICARRAY_H
 #define GHOST_DYNAMICARRAY_H
+
+#include <stdlib.h>
+#include <ghost/result.h>
+#include <ghost/alloc.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define GH_DYNAMICARRAY_NOMAXCAPACITY 0
 #define GH_DYNAMICARRAY(array) ((gh_dynamicarray) { \
@@ -14,10 +28,6 @@
             .capacity = &(array)->capacity, \
             .size = &(array)->size, \
         })
-
-#include <stdlib.h>
-#include <ghost/result.h>
-#include <ghost/alloc.h>
 
 typedef struct {
     gh_alloc * alloc;
@@ -46,4 +56,10 @@ gh_result gh_dynamicarray_appendmany(gh_dynamicarray da, const gh_dynamicarrayop
 gh_result gh_dynamicarray_removeat(gh_dynamicarray da, const gh_dynamicarrayoptions * options, size_t index);
 gh_result gh_dynamicarray_getat(gh_dynamicarray da, const gh_dynamicarrayoptions * options, size_t index, void ** out_ptr);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif
+
+/** @} */

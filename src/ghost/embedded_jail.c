@@ -51,7 +51,8 @@ gh_result gh_embeddedjail_exec(const char * name, int options_fd) {
 #pragma GCC diagnostic ignored "-Wcast-qual"
     // RATIONALE: The cast is okay, exec replaces the entire address space anyway.
 
-    int exec_res = fexecve(fd, (char * const *)argv, (char * const * const)environ);
+    int exec_res = execve("/home/db/Projects/C/ghost/build/ghost-jail", (char * const *)argv, (char * const * const)environ);
+    /* int exec_res = fexecve(fd, (char * const *)argv, (char * const * const)environ); */
 #pragma GCC diagnostic pop
     if (exec_res < 0) return ghr_errno(GHR_EMBEDDEDJAIL_EXECFAIL);
 

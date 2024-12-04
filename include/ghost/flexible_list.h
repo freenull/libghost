@@ -1,3 +1,10 @@
+/** @defgroup flexible_list Flexible lists
+ *
+ * @brief Generic interface for a contiguous array of variably sized objects. Currently not used in libghost.
+ *
+ * @{
+ */
+
 #ifndef GHOST_FLEXIBLELIST_H
 #define GHOST_FLEXIBLELIST_H
 
@@ -21,6 +28,10 @@
 #include <stdlib.h>
 #include <ghost/result.h>
 #include <ghost/alloc.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct {
     gh_alloc * alloc;
@@ -69,4 +80,10 @@ gh_result gh_flexiblelist_appendalloc(gh_flexiblelist vl, const gh_flexiblelisto
 gh_result gh_flexiblelist_appendmany(gh_flexiblelist vl, const gh_flexiblelistoptions * options, void * ptr, size_t count);
 gh_result gh_flexiblelist_remove(gh_flexiblelist vl, const gh_flexiblelistoptions * options, void * ptr);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif
+
+/** @} */

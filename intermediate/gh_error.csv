@@ -48,6 +48,14 @@ THREAD_LUAFAIL,,Lua script failed with an error according to subjail process
 THREAD_FORCEKILL,,Thread subjail process did not shut down in time and was forcefully killed
 THREAD_DESTROYED,,Cannot operate on destroyed thread
 THREAD_WAITCLOCK,,"Couldn't access monotonic clock, which means subjail couldn't be given an opportunity to use RPC functions in destructors and may have crashed"
+THREAD_LARGEHOSTVARNAME,,Host variable name is too long
+THREAD_LARGEHOSTVARSTRING,,Value of string host variable is too long
+THREAD_CALLNAMEMAX,,Remote Lua function name is too long
+THREAD_CALLPARAMMAX,,Too many parameters passed to remote Lua function call
+THREAD_CALLPARAMFAIL,,Failed preparing parameters for remote Lua function call
+THREAD_EXPECTEDLUAINFO,,Expected LUAINFO message from subjail
+THREAD_TOOMANYARGS,,Too many arguments specified for remote Lua function call frame
+THREAD_FDMEMNULL,,Got null virtual pointer for newly created block in fdmem
 
 JAIL_SIGCHLD,,Failed installing SIGCHLD signal handler in jail process
 JAIL_OPTIONSMEMFAIL,,Failed creating memory file containing sandbox options
@@ -69,6 +77,9 @@ JAIL_KILLFAIL,,Failed killing subjail
 JAIL_UNSUPPORTEDMSG,,Received message is explicitly not supported by this jail/subjail process
 JAIL_NORETURN,,Expected to receive FUNCTIONRETURN message after FUNCTIONCALL, but got another message
 JAIL_LUAINITFAIL,,Failed initializing Lua environment in subjail
+JAIL_LUACALLPARAM,,Invalid parameter to Lua function remote call
+JAIL_LUACALLRETURN,,Failed retrieving return value of Lua function remote call
+JAIL_LUACALLMISSING,,Target of Lua function remote call is missing
 
 LUA_FAIL,,Unknown error in Lua
 LUA_SYNTAX,,Syntax error during compilation of Lua script
@@ -88,6 +99,21 @@ IPC_RECVMSGTRUNC,,Message received over IPC socket was too long
 IPC_RECVTOOSMALL,,Message received over IPC socket was impossibly small
 IPC_NOCONTROLDATA,,IPC message should have container control header, but doesn't
 IPC_NOCONTROLMSG,,Attempted to send message with control data from an IPC object not in controller mode
+
+IPCFDMEM_OPENMEMFD,,Failed opening memory file for fdmem object
+IPCFDMEM_TRUNCATE,,Failed resizing memory file for fdmem object
+IPCFDMEM_GETLEN,,Failed retrieving length of fdmem file descriptor
+IPCFDMEM_MAPFAIL,,Failed mapping fdmem into memory
+IPCFDMEM_REMAPFAIL,,Failed remapping fdmem in memory
+IPCFDMEM_UNMAPFAIL,,Failed unmapping fdmem from memory
+IPCFDMEM_NOSPACE,,No space left in fdmem backing buffer
+IPCFDMEM_INVALIDPTR,,Invalid virtual pointer to fdmem
+IPCFDMEM_ZEROSIZE,,Invalid 0 size passed to fdmem read/write
+IPCFDMEM_SIZE,,Read/write size is out of range of fdmem data
+IPCFDMEM_SEAL,,Failed sealing fdmem file descriptor
+IPCFDMEM_CLOSE,,Failed closing file descriptor of fdmem object
+IPCFDMEM_SYNCSEALMIN,,Expected fdmem to grow by more
+IPCFDMEM_SYNCSEALMAX,,File represented by fdmem grew too large
 
 SHM_BLOCKHARDLIMIT,,Reached hard limit of SHM blocks
 SHM_BLOCKSOFTLIMIT,,Reached soft limit of SHM blocks
@@ -159,6 +185,8 @@ PROCFD_PROCPATHFDCLOSE,,Failed closing /proc/self/fd
 PATHFD_OPENFAIL,,Failed opening pathfd
 PATHFD_CLOSEFAIL,,Failed closing pathfd
 PATHFD_LARGETRAILINGNAME,,The last element of non-existent file/directory path is too large to store as a pathfd
+PATHFD_MAYNOTEXIST,,Pathfd cannot guarantee that the referenced node exists
+PATHFD_STATFAIL,,Stat on pathfd failed for unknown reason
 
 PERMFS_STATFAIL,,fstat(2) on file descriptor failed
 PERMFS_BADTYPE,,File type cannot be acted upon by permfs (not a regular file, directory or symlink)
@@ -167,10 +195,17 @@ PERMFS_FAILOPEN,,Failed opening file
 PERMFS_PATHFDOPENFAIL,,Failed opening path fd
 PERMFS_PATHFDCLOSEFAIL,,Failed closing path fd
 PERMFS_UNKNOWNMODE,,Unknown permfs mode flag
+PERMFS_NULLREQUEST,,Requested permissions with both self and children modes empty
+PERMFS_NOPATH,,Filesystem permission request without path
+PERMFS_LARGEDESCRIPTION,,Generated prompt request description was too large
 
 PERMS_REJECTEDPOLICY,,Permission to resource denied by existing security policy
 PERMS_REJECTEDUSER,,Permission to resource denied by user
 PERMS_REJECTEDPROMPT,,"Permission to resource denied, user should be prompted to change security policy"
+PERMS_MAXGENERIC,,Reached maximum amount of generic permission handlers
+PERMS_GENERICCTOR,,Generic permission handler constructor failed
+PERMS_UNKNOWNRESOURCE,,Permission group/resource is not supported
+PERMS_GENERICLARGEID,,Generic permission handler ID too long
 
 PERMPROMPT_UNSUPPORTEDGROUP,,Prompter does not support this permission group
 PERMPROMPT_UNSUPPORTEDRESOURCE,,Prompter does not support this permission resource
@@ -178,6 +213,8 @@ PERMPROMPT_MISSINGFIELD,,Required field was missing from prompter request
 PERMPROMPT_REJECTED,,Permission request was rejected by prompter
 PERMPROMPT_REJECTEDUSER,,User rejected permission request
 PERMPROMPT_REJECTEDUNKNOWN,,Permission request was rejected for unknown reason
+PERMPROMPT_UNTERMINATEDDESC,,Unterminated request key in description field
+PERMPARSER_DESCSTACKOVERFLOW,,Stack overflow when parsing description
 
 PERMPARSER_FAILEDSEEK,,Failed seeking file descriptor when constructing permission parser
 PERMPARSER_FAILEDMMAP,,Tokenizer failed mapping file to memory
@@ -212,5 +249,6 @@ STD_OPENTMPFILE,,Failed opening temporary file
 STD_CLOSETMPFILE,,Failed closing temporary file
 STD_NOENT,,File doesn't exist
 STD_UNLINK,,Failed unlinking filesystem node
+STD_INVALIDMODE,,Invalid filesystem node permission mode
 
 UNKNOWN,,Unknown error

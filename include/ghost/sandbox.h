@@ -1,9 +1,20 @@
+/** @defgroup sandbox Sandbox
+ *
+ * @brief Library representation of a live jail process with connected IPC.
+ *
+ * @{
+ */
+
 #ifndef GHOST_SANDBOX_H
 #define GHOST_SANDBOX_H
 
 #include <stdlib.h>
 #include <ghost/result.h>
 #include <ghost/ipc.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define GHOST_SANDBOXOPTIONS_NAME_MAX 256
 
@@ -55,4 +66,10 @@ gh_result gh_sandboxoptions_readfrom(int fd, gh_sandboxoptions * out_options);
  */
 gh_result gh_sandbox_dtor(gh_sandbox * sandbox, gh_result * out_jailresult);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif
+
+/** @} */

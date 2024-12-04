@@ -1,3 +1,10 @@
+/** @defgroup strings Strings
+ *
+ * @brief Internal string operation helper functions and string fat pointer structure.
+ *
+ * @{
+ */
+
 #ifndef GHOST_STRINGS_H
 #define GHOST_STRINGS_H
 
@@ -5,6 +12,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct {
     const char * buffer;
@@ -79,6 +90,33 @@ static inline bool gh_conststr_eqlzrz(const char * lhs, const char * rhs) {
     return lhs_size == strlen(rhs) && strncmp(lhs, rhs, lhs_size) == 0;
 }
 
+__attribute__((always_inline))
+static inline bool gh_conststr_fitsinc(gh_conststr s, size_t buffer_size) {
+    return s.size <= buffer_size;
+}
+
+__attribute__((always_inline))
+static inline bool gh_conststr_fitsinz(gh_conststr s, size_t buffer_size) {
+    return s.size < buffer_size;
+}
+
+__attribute__((always_inline))
+static inline bool gh_conststr_copyc(gh_conststr s, char * c, size_t c_size) {
+    if (!gh_conststr_fitsinc(s, c_size)) return false;
+
+    strncpy(c, s.buffer, s.size);
+    return true;
+}
+
+__attribute__((always_inline))
+static inline bool gh_conststr_copyz(gh_conststr s, char * c, size_t c_size) {
+    if (!gh_conststr_fitsinz(s, c_size)) return false;
+
+    strncpy(c, s.buffer, s.size);
+    c[s.size] = '\0';
+    return true;
+}
+
 #define gh_str_fromlit(str) (gh_str_fromc((str), sizeof(str)/sizeof(char) - 1, 0))
 gh_str gh_str_fromc(char * buf, size_t size, size_t capacity);
 gh_str gh_str_fromz(char * buf, size_t capacity);
@@ -89,6 +127,8 @@ void gh_str_trimrightn(gh_str * str, size_t n);
 void gh_str_trimrightchar(gh_str * str, char c);
 void gh_str_insertnull(gh_str * str);
 bool gh_str_rpos(gh_str str, char c, size_t * out_pos);
+bool gh_str_appendc(gh_str * str, const char * s, size_t size, bool allow_trunc);
+bool gh_str_appendz(gh_str * str, const char * s, bool allow_trunc);
 #define gh_str_endswithlit(str, lit) gh_str_endswith((str), (lit), sizeof(lit)/sizeof(char) - 1)
 
 __attribute__((always_inline))
@@ -173,4 +213,10 @@ static inline bool gh_str_copyz(gh_str s, char * c, size_t c_size) {
     return true;
 }
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif
+
+/** @} */

@@ -14,16 +14,16 @@ int main(void) {
     strcpy(req.group, "filesystem");
     strcpy(req.resource, "node");
     strcpy(req.fields[0].key, "path");
-    req.fields[0].value = "/foo/bar/baz";
-    req.fields[0].value_len = strlen(req.fields[0].value);
+    req.fields[0].value.buffer = "/foo/bar/baz";
+    req.fields[0].value.size = strlen(req.fields[0].value.buffer);
 
     strcpy(req.fields[1].key, "mode_self");
-    req.fields[1].value = "read,createdir";
-    req.fields[1].value_len = strlen(req.fields[1].value);
+    req.fields[1].value.buffer = "read,createdir";
+    req.fields[1].value.size = strlen(req.fields[1].value.buffer);
 
     strcpy(req.fields[2].key, "mode_children");
-    req.fields[2].value = "read,write";
-    req.fields[2].value_len = strlen(req.fields[2].value);
+    req.fields[2].value.buffer = "read,write";
+    req.fields[2].value.size = strlen(req.fields[2].value.buffer);
 
     assert(write(pipefd[1], "a\n", 2) == 2);
     gh_permresponse resp = {0};

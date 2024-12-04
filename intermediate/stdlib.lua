@@ -64,8 +64,11 @@ ffi.cdef[[
 
     struct file {
         FILE * _ptr;
-        // -- int _fd;
     };
+
+
+    typedef int gh_permfs_mode;
+    gh_permfs_mode gh_permfs_mode_fromident(const char * ident);
 ]]
 
 local MAP_FAILED = ffi.cast("void*", -1)
@@ -82,6 +85,9 @@ ghost.io = ghost_io
 
 local ghost_os = {}
 ghost.os = ghost_os
+
+local ghost_perm = {}
+ghost.perm = ghost_perm
 
 local ghfile_vtable = {}
 
@@ -147,9 +153,11 @@ function ghfile_vtable.seek(file, whence, offs)
     if c_whence == nil then
         error("invalid whence parameter: " .. tostring(whence))
     end
-
-    ffi.C.fseek(file._ptr, offs or 0, c_whence)
-
+    
+    local res = ffi.C.fseek(file._ptr, offs or 0, c_whence)
+    if res < 0 then
+        error("failed seeking file: " .. c_error())
+    end
     return ffi.C.ftell(file._ptr)
 end
 
@@ -399,7 +407,7 @@ ghost_io.open = function(path, mode)
     end
 
     local ok, fd = pcall(function()
-        return ghost.call("ghost.open", "int", path, ffi.new("int", open_mode), ffi.new("int", DEFAULT_FILE_MODE))
+        return ghost.call("ghost.open", nil, path, ffi.new("int", open_mode), ffi.new("int", DEFAULT_FILE_MODE))
     end)
 
     if not ok then
@@ -407,7 +415,7 @@ ghost_io.open = function(path, mode)
     end
 
     if fd < 0 then
-        return ni, "got fd < 0 from open"
+        return nil, "got fd < 0 from open"
     end
 
     local fileptr = ffi.C.fdopen(fd, c_fopenmode(mode))
@@ -440,7 +448,7 @@ ghost_io.tmpfile = function(prefix)
     prefix = tostring(prefix)
 
     local ok, path, fd = pcall(function()
-        return ghost.call("ghost.opentemp", "string", prefix or "", ffi.new("int", ffi.C.O_RDONLY + ffi.C.O_CREAT))
+        return ghost.call("ghost.opentemp", "string", 4096, prefix or "", ffi.new("int", ffi.C.O_RDONLY + ffi.C.O_CREAT))
     end)
 
     if not ok then
@@ -458,7 +466,6 @@ ghost_io.tmpfile = function(prefix)
     local tmp_meta = getmetatable(tmp_proxy)
     tmp_meta.__gc = function(self)
         ghost_os.remove(path)
-        -- TODO UNLINK TEMP FILE
     end
     table.insert(tmp_files, tmp_proxy)
     
@@ -533,8 +540,83 @@ ghost.os.tmpname = function(prefix)
     return path
 end
 
+local function permfs_mode(str_modes)
+    local c_mode = 0
+
+    for mode in string.gmatch(str_modes, "([^,]+)") do
+        local flag = ffi.C.gh_permfs_mode_fromident(mode)
+        if flag == 0 then
+            error("unknown filesystem permission mode: " .. tostring(mode))
+        end
+        c_mode = c_mode + flag
+    end
+
+    return c_mode
+end
+
+ghost.perm.askfile = function(path, modes)
+    local c_mode = permfs_mode(modes)
+
+    return pcall(function()
+        ghost.call("ghost.perm.fsrequest", nil, path, ffi.cast("int", c_mode), ffi.new("int", 0))
+    end)
+end
+
+ghost.perm.askdir = function(path, self_mode, children_mode)
+    local c_self_mode = self_mode and permfs_mode(self_mode) or 0
+    local c_children_mode = children_mode and permfs_mode(children_mode) or 0
+
+    if c_self_mode == 0 and c_children_mode == 0 then
+        return true
+    end
+
+    return pcall(function()
+        ghost.call("ghost.perm.fsrequest", nil, path, ffi.cast("int", c_self_mode), ffi.cast("int", c_children_mode))
+    end)
+end
+
+ghost.perm.filehas = function(path, modes)
+    local c_mode = permfs_mode(modes)
+
+    return ghost.call("ghost.perm.fshas", "boolean", path, ffi.cast("int", c_mode), ffi.new("int", 0))
+end
+
+ghost.perm.dirhas = function(path, self_mode, children_mode)
+    local c_self_mode = self_mode and permfs_mode(self_mode) or 0
+    local c_children_mode = children_mode and permfs_mode(children_mode) or 0
+
+    if c_self_mode == 0 and c_children_mode == 0 then
+        return true
+    end
+
+    return ghost.call("ghost.perm.fshas", "boolean", path, ffi.cast("int", c_self_mode), ffi.cast("int", c_children_mode))
+end
+
+ghost.require = function(path)
+    if package.loaded[path] then return package.loaded[path] end
+
+    path = path:gsub("\\.", "/") .. ".lua"
+
+    local f, err = ghost_io.open(path, "r")
+    if not f then error(err) end
+
+    local script = f:read("*a")
+    f:close()
+
+    local chunk = loadstring(script, path)
+
+    local module = chunk()
+    package.loaded[path] = module
+    return module
+end
+
 io = ghost_io
 package.loaded.io = ghost_io
 
 os = ghost_os
 package.loaded.os = ghost_os
+
+perm = ghost_perm
+package.loaded.perm = perm
+
+require = ghost.require

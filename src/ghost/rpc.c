@@ -33,9 +33,8 @@ static const gh_dynamicarrayoptions rpc_daopts = {
     .userdata = NULL
 };
 
-gh_result gh_rpc_ctor(gh_rpc * rpc, gh_alloc * alloc, gh_permprompter prompter) {
+gh_result gh_rpc_ctor(gh_rpc * rpc, gh_alloc * alloc) {
     rpc->alloc = alloc;
-    rpc->prompter = prompter;
     atomic_store(&rpc->thread_refcount, 0);
 
     int pthread_res = pthread_mutex_init(&rpc->global_mutex, NULL);

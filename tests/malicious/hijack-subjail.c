@@ -42,10 +42,17 @@ int main(void) {
     gh_alloc alloc = gh_alloc_default();
 
     gh_rpc rpc;
-    ghr_assert(gh_rpc_ctor(&rpc, &alloc, gh_permprompter_simpletui(STDIN_FILENO)));
+    ghr_assert(gh_rpc_ctor(&rpc, &alloc));
 
     gh_thread thread;
-    ghr_assert(gh_sandbox_newthread(&sbox, &rpc, "thread", "thread script", GH_IPC_NOTIMEOUT, &thread));
+    ghr_assert(gh_thread_ctor(&thread, (gh_threadoptions) {
+        .sandbox = &sbox,
+        .rpc = &rpc,
+        .prompter = gh_permprompter_simpletui(STDIN_FILENO),
+        .name = "thread",
+        .safe_id = "thread script",
+        .default_timeout_ms = GH_IPC_NOTIMEOUT,
+    }));
 
     int fd = open("hijack-subjail.lua", O_RDONLY);
     assert(fd >= 0);

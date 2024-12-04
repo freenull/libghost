@@ -1,10 +1,28 @@
+/** @defgroup rpc RPC
+ *
+ * @brief Object responsible for the registration and execution of remote procedure calls (calls into the trusted host process from the untrusted subjail).
+ *
+ * @{
+ */
+
 #ifndef GHOST_RPC_H
 #define GHOST_RPC_H
 
 #include <stdatomic.h>
 #include <ghost/ipc.h>
 #include <ghost/dynamic_array.h>
-#include <ghost/perms/perms.h>
+#include <ghost/perms/prompt.h>
+#include <pthread.h>
+
+#ifdef __cplusplus
+#include <atomic>
+#define GH_ATOMIC_OP(op) std::atomic_ ## op
+#define GH_ATOMIC_SIZE_T std::atomic<size_t>
+extern "C" {
+#else
+#define GH_ATOMIC_OP(op) atomic_ ## op
+#define GH_ATOMIC_SIZE_T atomic_size_t
+#endif
 
 #ifndef GH_TYPEDEF_THREAD
 typedef struct gh_thread gh_thread;
@@ -58,29 +76,28 @@ struct gh_rpcfunction {
 struct gh_rpc {
     gh_alloc * alloc;
     gh_rpcfunction * buffer;
-    gh_permprompter prompter;
     size_t size;
     size_t capacity;
-    _Atomic ssize_t thread_refcount;
+    GH_ATOMIC_SIZE_T thread_refcount;
     pthread_mutex_t global_mutex;
 };
 
 __attribute__((always_inline))
 static inline void gh_rpc_incthreadrefcount(gh_rpc * rpc) {
-    atomic_fetch_add(&rpc->thread_refcount, 1);
+    GH_ATOMIC_OP(fetch_add)(&rpc->thread_refcount, 1);
 }
 
 __attribute__((always_inline))
 static inline void gh_rpc_decthreadrefcount(gh_rpc * rpc) {
-    atomic_fetch_sub(&rpc->thread_refcount, 1);
+    GH_ATOMIC_OP(fetch_sub)(&rpc->thread_refcount, 1);
 }
 
 __attribute__((always_inline))
 static inline bool gh_rpc_isinuse(gh_rpc * rpc) {
-    return atomic_load(&rpc->thread_refcount) > 0;
+    return GH_ATOMIC_OP(load)(&rpc->thread_refcount) > 0;
 }
 
-gh_result gh_rpc_ctor(gh_rpc * rpc, gh_alloc * alloc, gh_permprompter prompter);
+gh_result gh_rpc_ctor(gh_rpc * rpc, gh_alloc * alloc);
 gh_result gh_rpc_dtor(gh_rpc * rpc);
 gh_result gh_rpc_register(gh_rpc * rpc, const char * name, gh_rpcfunction_func * func, gh_rpcfunction_threadsafety thread_safety);
 gh_result gh_rpc_newframe(gh_rpc * rpc, const char * name, gh_thread * thread, size_t arg_count, gh_rpcarg * args, gh_rpcarg return_arg, gh_rpcframe * out_frame);
@@ -105,8 +122,15 @@ bool gh_rpcframe_setreturnv(gh_rpcframe * frame, void * ptr, size_t size);
 
 void gh_rpcframe_setresult(gh_rpcframe * frame, gh_result result);
 #define gh_rpcframe_failhere(frame, result) { gh_rpcframe_setresult(frame, result); return; }
+#define gh_rpcframe_failarghere(frame, argnum) { gh_rpcframe_setresult(frame, GHR_RPCF_ARG ## argnum); return; }
 
 void gh_rpcframe_setreturnfd(gh_rpcframe * frame, int fd);
 #define gh_rpcframe_returnfdhere(frame, fd) { gh_rpcframe_setreturnfd(frame, fd); return; }
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif
+
+/** @} */

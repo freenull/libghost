@@ -27,13 +27,20 @@ int main(void) {
     gh_permprompter prompter = gh_permprompter_simpletui(STDIN_FILENO);
 
     gh_rpc rpc;
-    ghr_assert(gh_rpc_ctor(&rpc, &alloc, prompter));
+    ghr_assert(gh_rpc_ctor(&rpc, &alloc));
     gh_std_registerinrpc(&rpc);
 
     gh_thread thread;
-    ghr_assert(gh_sandbox_newthread(&sandbox, &rpc, "thread", "my thread", GH_IPC_NOTIMEOUT, &thread));
+    ghr_assert(gh_thread_ctor(&thread, (gh_threadoptions) {
+        .sandbox = &sandbox,
+        .rpc = &rpc,
+        .prompter = prompter,
+        .name = "thread",
+        .safe_id = "my thread",
+        .default_timeout_ms = GH_IPC_NOTIMEOUT
+    }));
 
-    int perms_file = open("saved.ghperm", O_RDONLY);
+    int perms_file = open("std.ghperm", O_RDONLY);
     assert(perms_file >= 0 || errno == ENOENT);
 
     if (perms_file >= 0) {
@@ -54,12 +61,25 @@ int main(void) {
     gh_result lua_result = gh_thread_runfilesync(&thread, script, &script_result);
     assert(close(script) >= 0);
 
+
+    gh_thread_callframe frame;
+    ghr_assert(gh_thread_callframe_ctor(&frame));
+    ghr_assert(gh_thread_callframe_string(&frame, "Hello, world!"));
+
+    ghr_assert(gh_thread_call(&thread, "luaprint", &frame));
+
+    const char * s;
+    assert(gh_thread_callframe_getstring(&frame, &s) == true);
+    printf("RETURN: %s\n", s);
+
+    ghr_assert(gh_thread_callframe_dtor(&frame));
+
     fprintf(stderr, "Script result: ");
     ghr_fputs(stderr, script_result.result);
 
     fprintf(stderr, "Script error: %s\n", script_result.error_msg);
 
-    perms_file = open("saved.ghperm", O_WRONLY | O_TRUNC | O_CREAT, 0644);
+    perms_file = open("std.ghperm", O_WRONLY | O_TRUNC | O_CREAT, 0644);
     assert(perms_file >= 0);
     ghr_assert(gh_perms_write(&thread.perms, perms_file));
 

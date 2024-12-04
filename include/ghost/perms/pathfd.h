@@ -1,8 +1,20 @@
+/** @defgroup pathfd pathfd
+ *
+ * @brief Safe reference to files and directories.
+ *
+ * @{
+ */
+
 #ifndef GHOST_PERMS_PATHFD_H
 #define GHOST_PERMS_PATHFD_H
 
+#include <sys/stat.h>
 #include <stdbool.h>
 #include <ghost/result.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define GH_PATHFD_TRAILINGNAMEMAX 4096
 
@@ -13,7 +25,14 @@ typedef struct {
 
 gh_result gh_pathfd_open(int dirfd, const char * path, gh_pathfd * out_pathfd);
 gh_result gh_pathfd_opentrailing(int dirfd, const char * path, gh_pathfd * out_pathfd);
-bool gh_pathfd_exists(gh_pathfd pathfd);
+gh_result gh_pathfd_stat(gh_pathfd pathfd, struct stat * out_statbuf);
+bool gh_pathfd_guaranteedtoexist(gh_pathfd pathfd);
 gh_result gh_pathfd_close(gh_pathfd pathfd);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif
+
+/** @} */

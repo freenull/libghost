@@ -144,7 +144,7 @@ static gh_result permparser_readidentifier(gh_permparser * parser, gh_permtoken 
 
     *out_token = (gh_permtoken) {
         .type = GH_PERMTOKEN_IDENTIFIER,
-        .value = gh_str_fromc(start, len, len),
+        .value = gh_conststr_fromc(start, len),
         .loc = start_loc
     };
 
@@ -199,7 +199,7 @@ static gh_result permparser_readstring(gh_permparser * parser, gh_permtoken * ou
     size_t size = (size_t)(parser->buffer.buffer + parser->buffer.size - start) - 1;
     *out_token = (gh_permtoken) {
         .type = GH_PERMTOKEN_STRING,
-        .value = gh_str_fromc(start, size, size),
+        .value = gh_conststr_fromc(start, size),
         .loc = start_loc
     };
 
@@ -220,7 +220,7 @@ gh_result gh_permparser_nexttoken(gh_permparser * parser, gh_permtoken * out_tok
     if (c == '\0') {
         *out_token = (gh_permtoken){
             .type = GH_PERMTOKEN_EOF,
-            .value = gh_str_fromlit("\0"),
+            .value = gh_conststr_fromlit("\0"),
             .loc = parser->loc,
         };
     } else if (c == '{') {
@@ -228,7 +228,7 @@ gh_result gh_permparser_nexttoken(gh_permparser * parser, gh_permtoken * out_tok
         permparser_nextchar(parser);
         *out_token = (gh_permtoken){
             .type = GH_PERMTOKEN_LBRACE,
-            .value = gh_str_fromlit("{"),
+            .value = gh_conststr_fromlit("{"),
             .loc = loc
         };
     } else if (c == '}') {
@@ -236,7 +236,7 @@ gh_result gh_permparser_nexttoken(gh_permparser * parser, gh_permtoken * out_tok
         permparser_nextchar(parser);
         *out_token = (gh_permtoken){
             .type = GH_PERMTOKEN_RBRACE,
-            .value = gh_str_fromlit("}"),
+            .value = gh_conststr_fromlit("}"),
             .loc = loc
         };
     } else if (c == '"') {
@@ -317,7 +317,7 @@ static gh_result permparser_parsenextresource(gh_permparser * parser, bool * out
     }
 
     gh_permrequest_id group_id;
-    if (!gh_str_copyz(token.value, group_id, GH_PERMREQUEST_IDMAX)) {
+    if (!gh_conststr_copyz(token.value, group_id, GH_PERMREQUEST_IDMAX)) {
         permparser_seterror(parser, token.loc);
         return GHR_PERMPARSER_LARGEGROUPID;
     }
@@ -331,7 +331,7 @@ static gh_result permparser_parsenextresource(gh_permparser * parser, bool * out
     }
 
     gh_permrequest_id resource_id;
-    if (!gh_str_copyz(token.value, resource_id, GH_PERMREQUEST_IDMAX)) {
+    if (!gh_conststr_copyz(token.value, resource_id, GH_PERMREQUEST_IDMAX)) {
         permparser_seterror(parser, token.loc);
         return GHR_PERMPARSER_LARGERESOURCEID;
     }
@@ -388,7 +388,7 @@ static gh_result permparser_parsenextresource(gh_permparser * parser, bool * out
             }
 
             gh_permrequest_id field;
-            if (!gh_str_copyz(token.value, field, GH_PERMREQUEST_IDMAX)) {
+            if (!gh_conststr_copyz(token.value, field, GH_PERMREQUEST_IDMAX)) {
                 permparser_seterror(parser, token.loc);
                 return GHR_PERMPARSER_LARGEFIELD;
             }
@@ -436,7 +436,7 @@ gh_result gh_permparser_parse(gh_permparser * parser) {
     }
 }
 
-gh_result gh_permparser_nextidentifier(gh_permparser * parser, gh_str * out_str) {
+gh_result gh_permparser_nextidentifier(gh_permparser * parser, gh_conststr * out_str) {
     permparser_seterror(parser, parser->loc);
 
     gh_permtoken token;
@@ -455,7 +455,7 @@ gh_result gh_permparser_nextidentifier(gh_permparser * parser, gh_str * out_str)
     return GHR_OK;
 }
 
-gh_result gh_permparser_nextstring(gh_permparser * parser, gh_str * out_str) {
+gh_result gh_permparser_nextstring(gh_permparser * parser, gh_conststr * out_str) {
     permparser_seterror(parser, parser->loc);
 
     gh_permtoken token;

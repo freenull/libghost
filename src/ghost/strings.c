@@ -69,3 +69,22 @@ bool gh_str_rpos(gh_str str, char c, size_t * out_pos) {
 
     return false;
 }
+
+bool gh_str_appendc(gh_str * str, const char * s, size_t size, bool allow_trunc) {
+    size_t remaining = str->capacity - str->size;
+    bool trunc = false;
+    if (remaining < size) {
+        size = remaining;
+
+        if (allow_trunc) trunc = true;
+        else return false;
+    }
+
+    strncpy(str->buffer + str->size, s, size);
+    str->size += size;
+    return !trunc;
+}
+
+bool gh_str_appendz(gh_str * str, const char * s, bool allow_trunc) {
+    return gh_str_appendc(str, s, strlen(s), allow_trunc);
+}

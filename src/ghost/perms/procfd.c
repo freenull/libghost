@@ -81,6 +81,19 @@ gh_result gh_procfd_fdpathctor(gh_procfd * procfd, gh_pathfd fd, gh_abscanonical
     size_t slash = 1;
     if (len == 1 && buffer[0] == '/') slash = 0;
 
+    struct stat statbuf;
+    if (fstat(fd.fd, &statbuf) >= 0) {
+        if (statbuf.st_nlink == 0) {
+            // Linux will add ' (deleted)' suffix, remove it
+            static const char * suffix = " (deleted)";
+            const size_t suffix_len = strlen(suffix);
+
+            if (len >= suffix_len && strncmp(buffer + len - suffix_len, suffix, suffix_len) == 0) {
+                len -= suffix_len;
+            }
+        }
+    }
+
     if (fd.trailing_name[0] != '\0') {
         size_t trailing_name_len = strlen(fd.trailing_name);
         size_t len_with_trailing = len + slash + trailing_name_len;
@@ -116,7 +129,7 @@ success:
 }
 
 gh_result gh_procfd_fdpathdtor(gh_procfd * procfd, gh_abscanonicalpath * path) {
-    return gh_alloc_delete(procfd->alloc, (void**)&path->ptr, path->len + 1);
+    return gh_alloc_delete(procfd->alloc, (void**)(void*)&path->ptr, path->len + 1);
 }
 
 gh_result gh_procfd_reopen(gh_procfd * procfd, gh_pathfd fd, int flags, mode_t create_mode, int * out_fd) {
@@ -128,7 +141,7 @@ gh_result gh_procfd_reopen(gh_procfd * procfd, gh_pathfd fd, int flags, mode_t c
 
     int new_fd = -1;
 
-    if (gh_pathfd_exists(fd)) {
+    if (gh_pathfd_guaranteedtoexist(fd)) {
         new_fd = openat(procfd->fd, fdfilename, flags, create_mode);
         if (new_fd < 0) return ghr_errno(GHR_PROCFD_REOPENFAIL);
     } else {

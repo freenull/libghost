@@ -80,7 +80,7 @@ int main(void) {
 
 
     gh_rpc rpc;
-    ghr_assert(gh_rpc_ctor(&rpc, &alloc, gh_permprompter_simpletui(STDIN_FILENO)));
+    ghr_assert(gh_rpc_ctor(&rpc, &alloc));
 
     ghr_assert(gh_rpc_register(&rpc, "printbanner", func_printbanner, GH_RPCFUNCTION_THREADUNSAFEGLOBAL));
     ghr_assert(gh_rpc_register(&rpc, "setbanner", func_setbanner, GH_RPCFUNCTION_THREADUNSAFEGLOBAL));
@@ -90,7 +90,15 @@ int main(void) {
         snprintf(name, strlen("thread") + 2, "thread%d", (int)i);
         name[strlen("thread") + 1] = '\0';
 
-        ghr_assert(gh_sandbox_newthread(&sandbox, &rpc, name, name, GH_IPC_NOTIMEOUT, threads + i));
+        gh_threadoptions thread_opts = (gh_threadoptions) {
+            .sandbox = &sandbox,
+            .rpc = &rpc,
+            .default_timeout_ms = GH_IPC_NOTIMEOUT,
+            .prompter = gh_permprompter_simpletui(STDIN_FILENO)
+        };
+        strcpy(thread_opts.name, name);
+        strcpy(thread_opts.safe_id, name);
+        ghr_assert(gh_thread_ctor(threads + i, thread_opts));
         assert(pthread_create(pthreads + i, NULL, thread_callback, threads + i) == 0);
     }
 

@@ -1,6 +1,6 @@
-#include "ghost/rpc.h"
 #define _GNU_SOURCE
 #include <sys/mman.h>
+#include <ghost/rpc.h>
 #include <ghost/perms/prompt.h>
 #include <ghost/result.h>
 #include <ghost/alloc.h>
@@ -26,19 +26,25 @@ int main(void) {
     gh_permprompter prompter = gh_permprompter_simpletui(pipefd[0]);
 
     gh_rpc rpc;
-    ghr_assert(gh_rpc_ctor(&rpc, &alloc, prompter));
+    ghr_assert(gh_rpc_ctor(&rpc, &alloc));
 
     gh_thread thread;
-    ghr_assert(gh_sandbox_newthread(&sandbox, &rpc, "thread", "my thread", GH_IPC_NOTIMEOUT, &thread));
+    ghr_assert(gh_thread_ctor(&thread, (gh_threadoptions) {
+        .sandbox = &sandbox,
+        .rpc = &rpc,
+        .prompter = prompter,
+        .name = "thread",
+        .safe_id = "my thread",
+        .default_timeout_ms = GH_IPC_NOTIMEOUT
+    }));
 
-    gh_perms perms;
-    ghr_assert(gh_perms_ctor(&perms, &alloc));
+    gh_perms * perms = &thread.perms;
 
     int permfd = open("parser_input.ghperm", O_RDONLY);
     assert(permfd >= 0);
 
     gh_permparser_error error;
-    gh_result res = gh_perms_readfd(&perms, permfd, &error);
+    gh_result res = gh_perms_readfd(perms, permfd, &error);
     if (ghr_iserr(res)) {
         fprintf(stderr, "Parser error detail: [%zu:%zu] %s\n", error.loc.row, error.loc.column, error.detail);
         ghr_fail(res);
@@ -49,14 +55,14 @@ int main(void) {
     ghr_assert(gh_pathfd_open(AT_FDCWD, "/tmp", &fd));
 
     // both READ and CREATEDIR are 'self accept' in /tmp entry
-    ghr_assert(gh_perms_actfilesystem(&thread, fd, GH_PERMFS_CREATEDIR | GH_PERMFS_READ, NULL));
+    ghr_assert(gh_perms_gatefile(&thread, fd, GH_PERMFS_CREATEDIR | GH_PERMFS_READ, NULL));
 
     // WRITE is 'self reject'
-    ghr_asserterr(GHR_PERMS_REJECTEDPOLICY, gh_perms_actfilesystem(&thread, fd, GH_PERMFS_CREATEDIR | GH_PERMFS_READ | GH_PERMFS_WRITE, NULL));
+    ghr_asserterr(GHR_PERMS_REJECTEDPOLICY, gh_perms_gatefile(&thread, fd, GH_PERMFS_CREATEDIR | GH_PERMFS_READ | GH_PERMFS_WRITE, NULL));
 
     assert(write(pipefd[1], "n\n", 2) == 2); // force next simpletui request to REJECT
     // CREATEFILE is explicit 'self prompt', so the prompt will appear and exit with REJECT (simpletui input n/N)
-    ghr_asserterr(GHR_PERMS_REJECTEDUSER, gh_perms_actfilesystem(&thread, fd, GH_PERMFS_CREATEDIR | GH_PERMFS_READ | GH_PERMFS_CREATEFILE, NULL));
+    ghr_asserterr(GHR_PERMS_REJECTEDUSER, gh_perms_gatefile(&thread, fd, GH_PERMFS_CREATEDIR | GH_PERMFS_READ | GH_PERMFS_CREATEFILE, NULL));
     ghr_assert(gh_pathfd_close(fd));
 
 
@@ -65,30 +71,30 @@ int main(void) {
 
 
     // READ in /tmp is 'children accept'
-    ghr_assert(gh_perms_actfilesystem(&thread, fd, GH_PERMFS_READ, NULL));
+    ghr_assert(gh_perms_gatefile(&thread, fd, GH_PERMFS_READ, NULL));
     assert(write(pipefd[1], "x\n", 2) == 2); // force next simpletui request to REJECT AND REMEMBER
 
     // CREATEFILE is not specified under 'children' in /tmp, so default action is used (prompt), prompt will return REJECT AND REMEMBER
-    ghr_asserterr(GHR_PERMS_REJECTEDUSER, gh_perms_actfilesystem(&thread, fd, GH_PERMFS_CREATEFILE, NULL));
+    ghr_asserterr(GHR_PERMS_REJECTEDUSER, gh_perms_gatefile(&thread, fd, GH_PERMFS_CREATEFILE, NULL));
 
     // because previous prompt was REJECTED AND REMEMBER, next attempt returns rejected by policy instead of rejected by user
-    ghr_asserterr(GHR_PERMS_REJECTEDPOLICY, gh_perms_actfilesystem(&thread, fd, GH_PERMFS_CREATEFILE, NULL));
+    ghr_asserterr(GHR_PERMS_REJECTEDPOLICY, gh_perms_gatefile(&thread, fd, GH_PERMFS_CREATEFILE, NULL));
 
     // WRITE is explicitly 'children reject' under /tmp
-    ghr_asserterr(GHR_PERMS_REJECTEDPOLICY, gh_perms_actfilesystem(&thread, fd, GH_PERMFS_WRITE, NULL));
-    ghr_assert(gh_perms_actfilesystem(&thread, fd, GH_PERMFS_READ, NULL));
+    ghr_asserterr(GHR_PERMS_REJECTEDPOLICY, gh_perms_gatefile(&thread, fd, GH_PERMFS_WRITE, NULL));
+    ghr_assert(gh_perms_gatefile(&thread, fd, GH_PERMFS_READ, NULL));
     ghr_assert(gh_pathfd_close(fd));
 
     // TESTING PERMISSIONS ON /foobar.txt
     ghr_assert(gh_pathfd_open(AT_FDCWD, "/foobar.txt", &fd));
 
     // READ on /foobar.txt is 'self accept'
-    ghr_assert(gh_perms_actfilesystem(&thread, fd, GH_PERMFS_READ, NULL));
+    ghr_assert(gh_perms_gatefile(&thread, fd, GH_PERMFS_READ, NULL));
 
     assert(write(pipefd[1], "n\n", 2) == 2); // force next simpletui request to REJECT
 
     // no mode other than READ is specified on /foobar.txt, so default action is used (prompt), prompt will return REJECT
-    ghr_asserterr(GHR_PERMS_REJECTEDUSER, gh_perms_actfilesystem(&thread, fd, GH_PERMFS_CREATEFILE, NULL));
+    ghr_asserterr(GHR_PERMS_REJECTEDUSER, gh_perms_gatefile(&thread, fd, GH_PERMFS_CREATEFILE, NULL));
 
     assert(close(permfd) >= 0);
 
@@ -98,7 +104,7 @@ int main(void) {
     // (all of the rules should be the same, with the exception of a new /tmp/foobar.txt entry
     //  with self reject on CREATEFILE)
     int outputfd = memfd_create("output", 0);
-    ghr_assert(gh_perms_write(&perms, outputfd));
+    ghr_assert(gh_perms_write(perms, outputfd));
     assert(lseek(outputfd, 0, SEEK_SET) >= 0);
     char output_buf[4096] = {0};
     assert(read(outputfd, output_buf, sizeof(output_buf)) >= 0);
@@ -109,8 +115,6 @@ int main(void) {
     assert(strcmp(output_buf, output_check_buf) == 0);
     assert(close(outputfd) >= 0);
     assert(close(outputcheckfd) >= 0);
-
-    ghr_assert(gh_perms_dtor(&perms));
 
     ghr_assert(gh_thread_dtor(&thread, NULL));
 

@@ -46,26 +46,11 @@ static bool message_recv(gh_ipc * ipc, gh_ipcmsg * msg) {
         if (close(sockfd) < 0) ghr_fail(GHR_JAIL_CLOSEFDFAIL);
         break;
 
-    case GH_IPCMSG_KILLSUBJAIL: {
-        gh_ipcmsg_killsubjail * killmsg = (gh_ipcmsg_killsubjail * )msg;
-        if (kill(killmsg->pid, SIGKILL) < 0) {
-            ghr_fail(GHR_JAIL_KILLFAIL);
-        }
-        (void)waitpid(killmsg->pid, NULL, 0);
-
-        ghr_assert(gh_ipc_send(ipc, (gh_ipcmsg *)&(gh_ipcmsg_subjaildead){
-            .type = GH_IPCMSG_SUBJAILDEAD,
-            .pid = killmsg->pid
-        }, sizeof(gh_ipcmsg_subjaildead)));
-
-        break;
-    }
-
-    case GH_IPCMSG_SUBJAILDEAD: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
-
     case GH_IPCMSG_LUASTRING: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
     case GH_IPCMSG_LUAFILE: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
+    case GH_IPCMSG_LUAHOSTVARIABLE: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
     case GH_IPCMSG_LUAINFO: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
+    case GH_IPCMSG_LUACALL: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
     case GH_IPCMSG_LUARESULT: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
 
     case GH_IPCMSG_FUNCTIONCALL: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
@@ -179,6 +164,8 @@ gh_result gh_jail_lockdown(gh_sandboxoptions * options) {
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW),
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_KILL_PROCESS),
 
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_mremap, 31, 0),
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_ftruncate, 30, 0),
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_fsync, 29, 0),
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_lseek, 28, 0),
 

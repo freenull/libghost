@@ -5,9 +5,11 @@ include(CTest)
 include(CMakeParseArguments)
 include(ExternalProject)
 
+set(libghost_cflags "")
 function(GhostAddCFlags)
-    string (REPLACE ";" " " flag_str "${ARGN}")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${flag_str}" PARENT_SCOPE)
+    # string (REPLACE ";" " " flag_str "${ARGN}")
+    set(flag_str "${ARGN}")
+    set(libghost_cflags "${libghost_cflags};${flag_str}" PARENT_SCOPE)
 endfunction()
 
 if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
@@ -56,8 +58,6 @@ GhostAddCFlags(-Wno-unknown-pragmas)
 GhostAddCFlags(-fno-strict-aliasing)
 # The library may potentially contain strict aliasing violations. It's safer to turn this on than hope everything works correctly.
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ")
-
 set(enumgen "tools/enumgen.py")
 set(enum_error_src "intermediate/gh_error.csv")
 set(enum_error_out_header "${PROJECT_SOURCE_DIR}/include/ghost/generated/gh_error.h")
@@ -66,7 +66,7 @@ set(enum_error_out ${enum_error_out_header} ${enum_error_out_source})
 
 add_custom_command(
     OUTPUT ${enum_error_out}
-    COMMAND ${PROJECT_SOURCE_DIR}/tools/enumgen.py -p GHR_ -c "${PROJECT_SOURCE_DIR}/intermediate/gh_error.csv" -H ${enum_error_out_header} -S ${enum_error_out_source} -n gh_error
+    COMMAND ${PROJECT_SOURCE_DIR}/tools/enumgen.py -p GHR_ -c "${PROJECT_SOURCE_DIR}/intermediate/gh_error.csv" -H ${enum_error_out_header} -S ${enum_error_out_source} -n gh_error -d "Set of all error codes returned by libghost functions."
     DEPENDS ${enum_error_src}
 )
 add_custom_target(ghost-enum-error DEPENDS ${enum_error_out})
@@ -114,14 +114,6 @@ function(GhostCodegenTarget target_name)
     add_custom_target(${target_name} DEPENDS ${output_path_list})
 endfunction()
 
-GhostCodegenTarget(
-    ghost-enum-msgtype
-    INPUT intermediate/ipc_msgtype.py
-    OUTPUT
-        "header=${PROJECT_SOURCE_DIR}/include/ghost/generated/gh_ipcmsg.h"
-        "source=${PROJECT_SOURCE_DIR}/src/ghost/generated/gh_ipcmsg.c"
-)
-
 file(GLOB ghost_src "src/ghost/*.c")
 file(GLOB ghost_perms_src "src/ghost/perms/*.c")
 list(APPEND ghost_src ${ghost_perms_src})
@@ -161,6 +153,7 @@ set_target_properties(libghost-nojail PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(libghost-nojail PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 set_target_properties(libghost-nojail PROPERTIES OUTPUT_NAME "ghost")
 target_include_directories(libghost-nojail PRIVATE include)
+target_compile_options(libghost-nojail PRIVATE ${libghost_cflags})
 
 target_sources(
     libghost-nojail
@@ -190,6 +183,7 @@ add_executable(ghost-jail "${jail_src}")
 add_dependencies(ghost-jail luajit)
 target_link_libraries(ghost-jail PUBLIC libghost-nojail libluajit m)
 target_include_directories(ghost-jail PRIVATE ${luajit_include} ${libs_include})
+target_compile_options(ghost-jail PRIVATE ${libghost_cflags})
 
 add_custom_command(
     OUTPUT "${PROJECT_BINARY_DIR}/embedded_jail.c"
@@ -219,6 +213,7 @@ set_target_properties(libghost PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 set_target_properties(libghost PROPERTIES OUTPUT_NAME "ghost")
 target_compile_definitions(libghost PUBLIC GH_EMBEDDEDJAIL_PROVIDED)
 target_include_directories(libghost PRIVATE include)
+target_compile_options(libghost PRIVATE ${libghost_cflags})
 
 target_sources(
     libghost
@@ -241,3 +236,9 @@ install(
 )
 
 add_subdirectory(tests)
+
+option(EXAMPLES "Build examples" OFF)
+
+if (EXAMPLES)
+    add_subdirectory(examples)
+endif()

@@ -36,7 +36,7 @@ ffi.cdef[[
 
 local function retbuffer_ctype(t, size)
     if t == "string" then
-        return "char [" .. tostring(size) .. "]"
+        return "char [?]", size
     elseif t == "number" then
         return "double[1]"
     elseif t == "boolean" then
@@ -49,13 +49,13 @@ local function retbuffer_ctype(t, size)
     end
 end
 
-local function retbuffer_read(ret_cdata, t)
+local function retbuffer_read(ret_cdata, ret_size, t)
     if t == "string" then
-        return ffi.string(ret_cdata)
+        return ffi.string(ret_cdata, ret_size)
     elseif t == "number" then
         return ret_cdata[0]
     elseif t == "boolean" then
-        return ret_cdata[0] == 0 and true or false
+        return ret_cdata[0]
     -- custom
     elseif t == "int" then
         return ret_cdata[0]
@@ -124,20 +124,27 @@ function ghost.call(name, ret_type, ...)
     local ret_obj = nil
     local ret_size = 0
 
-    if ret_type ~= nil then
-        local ctype = retbuffer_ctype(ret_type, 128)
+    local arg_offs = 0
 
-        ret_obj = ffi.new(ctype)
-        ret_size = ffi.sizeof(ctype)
+    if ret_type ~= nil then
+        local size = 0
+
+        if ret_type == "string" then
+            size = select(1, ...)
+            arg_offs = arg_offs + 1
+        end
+
+        ret_obj = ffi.new(retbuffer_ctype(ret_type, size))
+        ret_size = ffi.sizeof(ret_obj)
     end
 
-    local arg_count = select("#", ...)
-    local args = ffi.new("gh_ipcmsg_functioncall_arg[" .. tostring(arg_count) .. "]")
+    local arg_count = select("#", ...) - arg_offs
+    local args = ffi.new("gh_ipcmsg_functioncall_arg[?]", arg_count)
 
     local gc_protect = {}
     local n = 1
     for i = 1, arg_count do
-        local obj = arg_obj(select(i, ...), args, i - 1)
+        local obj = arg_obj(select(i + arg_offs, ...), args, i - 1)
         if obj ~= nil then
             gc_protect[n] = obj
             n = n + 1
@@ -150,7 +157,7 @@ function ghost.call(name, ret_type, ...)
     handle_ghr(result)
 
     if ret_obj ~= nil then
-        local ret_value = retbuffer_read(ret_obj, ret_type)
+        local ret_value = retbuffer_read(ret_obj, ret_size, ret_type)
         if fd_ret[0] ~= -1 then
             return ret_value, fd_ret[0]
         else

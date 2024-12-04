@@ -1,3 +1,10 @@
+/** @defgroup result Result
+ *
+ * @brief Result type used across the entire library. Combines a set of library errors and errno into one unsigned 32 bit value with convenient functions for asserting and printing.
+ *
+ * @{
+ */
+
 #ifndef GHOST_RESULT_H
 #define GHOST_RESULT_H
 
@@ -6,6 +13,11 @@
 #include <stdio.h>
 #include <signal.h>
 #include <ghost/generated/gh_error.h>
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /** @brief Result/error type for libghost API.
  *
@@ -93,4 +105,10 @@ void ghr_fprintf(FILE * file, gh_result value);
 void ghr_fputs(FILE * file, gh_result value);
 void ghr_stringify(char * buf, size_t max_size, gh_result value);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif
+
+/** @} */

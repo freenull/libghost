@@ -1,3 +1,10 @@
+/** @defgroup ipc IPC
+ *
+ * @brief Inter-process communication primitive with the ability to send/receive various messages and transfer file descriptors.
+ *
+ * @{
+ */
+
 #ifndef GHOST_IPC_H
 #define GHOST_IPC_H
 
@@ -7,6 +14,12 @@
 #include <sys/types.h>
 #include <ghost/result.h>
 #include <ghost/alloc.h>
+#include <ghost/fdmem.h>
+#include <ghost/byte_buffer.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define GH_CONCAT2(A,B) A##B
 #define GH_CONCAT(A,B) GH_CONCAT2(A,B)
@@ -39,14 +52,12 @@ typedef enum {
 
     // jail recv
     GH_IPCMSG_NEWSUBJAIL,
-    GH_IPCMSG_KILLSUBJAIL,
-
-    // jail send
-    GH_IPCMSG_SUBJAILDEAD,
 
     // subjail recv
     GH_IPCMSG_LUASTRING,
     GH_IPCMSG_LUAFILE,
+    GH_IPCMSG_LUAHOSTVARIABLE,
+    GH_IPCMSG_LUACALL,
     GH_IPCMSG_FUNCTIONRETURN,
 
     // subjail send
@@ -83,13 +94,6 @@ GH_IPCMSG_ALIGN
 typedef struct {
     gh_ipcmsg_type type;
     pid_t pid;
-    bool wait_for_graceful;
-} gh_ipcmsg_killsubjail;
-
-GH_IPCMSG_ALIGN
-typedef struct {
-    gh_ipcmsg_type type;
-    pid_t pid;
 } gh_ipcmsg_subjaildead;
 
 GH_IPCMSG_ALIGN
@@ -98,12 +102,6 @@ typedef struct {
     int index;
     pid_t pid;
 } gh_ipcmsg_subjailalive;
-
-GH_IPCMSG_ALIGN
-typedef struct {
-    gh_ipcmsg_type type;
-    int index;
-} gh_ipcmsg_testcase;
 
 #define GH_IPCMSG_LUASTRING_MAXSIZE (GH_IPCMSG_MAXSIZE - sizeof(gh_ipcmsg_type))
 GH_IPCMSG_ALIGN
@@ -114,7 +112,7 @@ typedef struct {
 
 GH_STATICASSERT(
     sizeof(gh_ipcmsg_luastring) <= GH_IPCMSG_MAXSIZE,
-    "Lua result message exceeds max IPC message size"
+    "Lua string message exceeds max IPC message size"
 );
 
 #define GH_IPCMSG_LUAFILE_CHUNKNAMEMAX 512
@@ -125,6 +123,47 @@ typedef struct {
     char chunk_name[GH_IPCMSG_LUAFILE_CHUNKNAMEMAX];
 } gh_ipcmsg_luafile;
 
+typedef enum {
+    GH_IPCMSG_LUAHOSTVARIABLE_INT,
+    GH_IPCMSG_LUAHOSTVARIABLE_DOUBLE,
+    GH_IPCMSG_LUAHOSTVARIABLE_STRING,
+} gh_ipcmsg_luahostvariable_type;
+
+#define GH_IPCMSG_LUAHOSTVARIABLE_NAMEMAX 128
+#define GH_IPCMSG_LUAHOSTVARIABLE_STRINGMAX 1024
+GH_IPCMSG_ALIGN
+typedef struct {
+    gh_ipcmsg_type type;
+    gh_ipcmsg_luahostvariable_type datatype;
+    char name[GH_IPCMSG_LUAHOSTVARIABLE_NAMEMAX];
+    union {
+        struct {
+            char buffer[GH_IPCMSG_LUAHOSTVARIABLE_STRINGMAX];
+            size_t len;
+        } t_string;
+        int t_integer;
+        double t_double;
+    };
+    int table_index;
+} gh_ipcmsg_luahostvariable;
+
+GH_STATICASSERT(
+    sizeof(gh_ipcmsg_luahostvariable) <= GH_IPCMSG_MAXSIZE,
+    "Lua host variable message exceeds max IPC message size"
+);
+
+
+#define GH_IPCMSG_LUACALL_NAMEMAX 128
+#define GH_IPCMSG_LUACALL_MAXPARAMS 16
+GH_IPCMSG_ALIGN
+typedef struct {
+    gh_ipcmsg_type type;
+    int ipcfdmem_fd;
+    size_t ipcfdmem_occupied;
+    char name[GH_IPCMSG_LUACALL_NAMEMAX];
+    gh_fdmem_ptr params[GH_IPCMSG_LUACALL_MAXPARAMS];
+} gh_ipcmsg_luacall;
+
 GH_IPCMSG_ALIGN
 typedef struct {
     gh_ipcmsg_type type;
@@ -132,13 +171,15 @@ typedef struct {
 } gh_ipcmsg_luainfo;
 
 #define GH_IPCMSG_LUARESULT_ERRORMSGMAX 1024
-
 GH_IPCMSG_ALIGN
 typedef struct {
     gh_ipcmsg_type type;
     gh_result result;
     char error_msg[GH_IPCMSG_LUARESULT_ERRORMSGMAX];
     int script_id;
+
+    // only filled in for response to LUACALL
+    gh_fdmem_ptr return_ptr;
 } gh_ipcmsg_luaresult;
 
 GH_STATICASSERT(
@@ -236,4 +277,10 @@ gh_result gh_ipc_recv(gh_ipc * ipc, gh_ipcmsg * msg, int timeout_ms);
 
 gh_result gh_ipc_call(gh_ipc * ipc, const char * name, size_t argc, gh_ipcmsg_functioncall_arg * args, int * return_fd, void * return_arg, size_t return_arg_size);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif
+
+/** @} */
