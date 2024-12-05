@@ -10,6 +10,8 @@ f:close()
 print("YES FILE:", f)
 
 print("os.execute =", os.execute)
+
+print(os.execute("adfsdf"))
 local result = os.execute("echo one")
 print("os.execute result:", result)
 
