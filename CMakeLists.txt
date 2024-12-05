@@ -142,9 +142,14 @@ add_library(libluajit STATIC IMPORTED)
 add_dependencies(libluajit luajit)
 set_target_properties(libluajit PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/libs/luajit/src/libluajit.a")
 
+set(SHA256_PROVIDER_LIB "ssl" CACHE INTERNAL "Library needed to link the SHA256 provider.")
+set(SHA256_PROVIDER_INC "" CACHE INTERNAL "Compiler include paths needed to link the SHA256 provider.")
+set(SHA256_PROVIDER_IMPL "${CMAKE_SOURCE_DIR}/src/sha256provider_openssl.c" CACHE STRING "Source file implementing the SHA256 provider interface.")
+
 list(APPEND ghost_src ${enum_error_out_source})
 list(APPEND ghost_src "${PROJECT_BINARY_DIR}/lua_init.c")
 list(APPEND ghost_src "${PROJECT_BINARY_DIR}/lua_stdlib.c")
+list(APPEND ghost_src "${SHA256_PROVIDER_IMPL}")
 list(APPEND ghost_inc ${enum_error_out_header})
 
 add_library(libghost-nojail SHARED "${ghost_src}")
@@ -152,7 +157,8 @@ add_dependencies(libghost-nojail ghost-enum-error ghost-enum-permfs_mode ghost-j
 set_target_properties(libghost-nojail PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(libghost-nojail PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 set_target_properties(libghost-nojail PROPERTIES OUTPUT_NAME "ghost")
-target_include_directories(libghost-nojail PRIVATE include)
+target_link_libraries(libghost-nojail PRIVATE ${SHA256_PROVIDER_LIB})
+target_include_directories(libghost-nojail PRIVATE include ${SHA256_PROVIDER_INC})
 target_compile_options(libghost-nojail PRIVATE ${libghost_cflags})
 
 target_sources(
@@ -192,7 +198,7 @@ add_custom_command(
 )
 add_custom_target(ghost-embedded-jail DEPENDS "${PROJECT_BINARY_DIR}/embedded_jail.c" ghost-jail)
 
-set(ghost_embedded_jail_src "src/ghost/embedded_jail.c")
+set(ghost_embedded_jail_src "${PROJECT_BINARY_DIR}/embedded_jail.c")
 
 # In the future, this can be used to avoid the need to build libghost sources twice
 # In its current form, it causes an issue with dependency resolution
@@ -212,12 +218,13 @@ set_target_properties(libghost PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(libghost PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 set_target_properties(libghost PROPERTIES OUTPUT_NAME "ghost")
 target_compile_definitions(libghost PUBLIC GH_EMBEDDEDJAIL_PROVIDED)
-target_include_directories(libghost PRIVATE include)
+target_link_libraries(libghost PRIVATE ${SHA256_PROVIDER_LIB})
+target_include_directories(libghost PRIVATE include ${SHA256_PROVIDER_INC})
 target_compile_options(libghost PRIVATE ${libghost_cflags})
 
 target_sources(
     libghost
-    PRIVATE "${PROJECT_BINARY_DIR}/embedded_jail.c"
+    PRIVATE ${ghost_src}
     PUBLIC FILE_SET HEADERS
     BASE_DIRS ${PROJECT_SOURCE_DIR}/include
     FILES ${ghost_inc}

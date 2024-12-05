@@ -89,7 +89,6 @@ gh_result gh_permfs_entrylist_getat(gh_permfs_entrylist * list, size_t idx, gh_p
 gh_result gh_permfs_entrylist_dtor(gh_permfs_entrylist * list);
 
 typedef struct {
-    gh_procfd procfd;
     gh_permfs_entrylist file_perms;
 } gh_permfs;
 
@@ -101,8 +100,8 @@ typedef struct {
 gh_result gh_permfs_ctor(gh_permfs * permfs, gh_alloc * alloc);
 gh_result gh_permfs_add(gh_permfs * permfs, gh_permfs_ident ident, gh_permfs_modeset self_modeset, gh_permfs_modeset children_modeset, gh_permfs_entry ** out_entry);
 gh_result gh_permfs_getmode(gh_permfs * permfs, int opath_fd, gh_abscanonicalpath canonical_path, gh_permfs_modeset * out_self_modeset, gh_permfs_modeset * out_children_modeset);
-gh_result gh_permfs_gatefile(gh_permfs * permfs, gh_permprompter * prompter, const char * safe_id, gh_pathfd fd, gh_permfs_mode mode, const char * hint);
-gh_result gh_permfs_requestnode(gh_permfs * permfs, gh_permprompter * prompter, const char * safe_id, gh_pathfd fd, gh_permfs_mode self_mode, gh_permfs_mode children_mode, const char * hint, bool * out_wouldprompt);
+gh_result gh_permfs_gatefile(gh_permfs * permfs, gh_permprompter * prompter, gh_procfd * procfd, const char * safe_id, gh_pathfd fd, gh_permfs_mode mode, const char * hint);
+gh_result gh_permfs_requestnode(gh_permfs * permfs, gh_permprompter * prompter, gh_procfd * procfd, const char * safe_id, gh_pathfd fd, gh_permfs_mode self_mode, gh_permfs_mode children_mode, const char * hint, bool * out_wouldprompt);
 gh_result gh_permfs_dtor(gh_permfs * permfs);
 gh_result gh_permfs_fcntlflags2permfsmode(int fcntl_flags, mode_t create_accessmode, gh_pathfd pathfd, gh_permfs_mode * out_mode);
 gh_result gh_permfs_registerparser(gh_permfs * permfs, gh_permparser * parser);

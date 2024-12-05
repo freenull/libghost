@@ -153,6 +153,7 @@ RPC_GLOBALMUTEXINIT,,Failed initializing global mutex
 RPC_GLOBALMUTEXDESTROY,,Failed destroying global mutex
 RPC_GLOBALMUTEXLOCK,,Failed locking global mutex for thread unsafe function
 RPC_GLOBALMUTEXUNLOCK,,Failed unlocking global mutex for thread unsafe function
+RPC_INVALIDFD,,Remote procedure attempted to return a file descriptor that was invalid
 
 RPCF_ARG0,,Invalid argument #1
 RPCF_ARG1,,Invalid argument #2
@@ -206,6 +207,7 @@ PERMS_MAXGENERIC,,Reached maximum amount of generic permission handlers
 PERMS_GENERICCTOR,,Generic permission handler constructor failed
 PERMS_UNKNOWNRESOURCE,,Permission group/resource is not supported
 PERMS_GENERICLARGEID,,Generic permission handler ID too long
+PERMS_EMERGENCYTRUNC,,Failed clearing out permission store file when trying to recover from another error
 
 PERMPROMPT_UNSUPPORTEDGROUP,,Prompter does not support this permission group
 PERMPROMPT_UNSUPPORTEDRESOURCE,,Prompter does not support this permission resource
@@ -250,5 +252,21 @@ STD_CLOSETMPFILE,,Failed closing temporary file
 STD_NOENT,,File doesn't exist
 STD_UNLINK,,Failed unlinking filesystem node
 STD_INVALIDMODE,,Invalid filesystem node permission mode
+STD_SPAWNPTY,,Failed creating pseudoterminal for new external command process
+STD_SPAWNPTYCLOSE,,Failed closing pseudoterminal of new external command process
+STD_SPAWNPIPE,,Failed creating pipes for new external command process
+STD_SPAWNWAIT,,Failed waiting for external command process to terminate
+STD_SPAWNPIPECLOSE,,Failed closing pipe of new external command process
+
+SHA256_FAILED,,Failed calculating SHA256 hash
+
+PERMEXEC_NEGARGC,,Negative argc passed
+PERMEXEC_TOOMANYARGS,,Cannot validate permissions for attempts to execute functions with over 24 arguments
+PERMEXEC_LARGEDESCRIPTION,,Generated description for permexec prompt would be too large to pass to prompter
+PERMEXEC_LARGECMDLINE,,Generated command line for permexec prompt would be too large to pass to prompter
+PERMEXEC_LARGEENV,,Generated list of environment variables for permexec prompt would be too large to pass to prompter
+PERMEXEC_MAKEREQUEST,,Failed creating prompt request for permexec
+PERMEXEC_NOTHASH,,Expected string containing hex-encoded hash
+
 
 UNKNOWN,,Unknown error

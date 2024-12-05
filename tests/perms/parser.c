@@ -52,49 +52,49 @@ int main(void) {
 
     // TESTING PERMISSIONS ON /tmp
     gh_pathfd fd;
-    ghr_assert(gh_pathfd_open(AT_FDCWD, "/tmp", &fd));
+    ghr_assert(gh_pathfd_open(AT_FDCWD, "/tmp", &fd, false));
 
     // both READ and CREATEDIR are 'self accept' in /tmp entry
-    ghr_assert(gh_perms_gatefile(&thread, fd, GH_PERMFS_CREATEDIR | GH_PERMFS_READ, NULL));
+    ghr_assert(gh_perms_gatefile(&thread.perms, thread.safe_id, fd, GH_PERMFS_CREATEDIR | GH_PERMFS_READ, NULL));
 
     // WRITE is 'self reject'
-    ghr_asserterr(GHR_PERMS_REJECTEDPOLICY, gh_perms_gatefile(&thread, fd, GH_PERMFS_CREATEDIR | GH_PERMFS_READ | GH_PERMFS_WRITE, NULL));
+    ghr_asserterr(GHR_PERMS_REJECTEDPOLICY, gh_perms_gatefile(&thread.perms, thread.safe_id, fd, GH_PERMFS_CREATEDIR | GH_PERMFS_READ | GH_PERMFS_WRITE, NULL));
 
     assert(write(pipefd[1], "n\n", 2) == 2); // force next simpletui request to REJECT
     // CREATEFILE is explicit 'self prompt', so the prompt will appear and exit with REJECT (simpletui input n/N)
-    ghr_asserterr(GHR_PERMS_REJECTEDUSER, gh_perms_gatefile(&thread, fd, GH_PERMFS_CREATEDIR | GH_PERMFS_READ | GH_PERMFS_CREATEFILE, NULL));
+    ghr_asserterr(GHR_PERMS_REJECTEDUSER, gh_perms_gatefile(&thread.perms, thread.safe_id, fd, GH_PERMFS_CREATEDIR | GH_PERMFS_READ | GH_PERMFS_CREATEFILE, NULL));
     ghr_assert(gh_pathfd_close(fd));
 
 
     // TESTING PERMISISON ON /tmp/foobar.txt (pathfd handles non existing files correctly)
-    ghr_assert(gh_pathfd_open(AT_FDCWD, "/tmp/foobar.txt", &fd));
+    ghr_assert(gh_pathfd_open(AT_FDCWD, "/tmp/foobar.txt", &fd, false));
 
 
     // READ in /tmp is 'children accept'
-    ghr_assert(gh_perms_gatefile(&thread, fd, GH_PERMFS_READ, NULL));
+    ghr_assert(gh_perms_gatefile(&thread.perms, thread.safe_id, fd, GH_PERMFS_READ, NULL));
     assert(write(pipefd[1], "x\n", 2) == 2); // force next simpletui request to REJECT AND REMEMBER
 
     // CREATEFILE is not specified under 'children' in /tmp, so default action is used (prompt), prompt will return REJECT AND REMEMBER
-    ghr_asserterr(GHR_PERMS_REJECTEDUSER, gh_perms_gatefile(&thread, fd, GH_PERMFS_CREATEFILE, NULL));
+    ghr_asserterr(GHR_PERMS_REJECTEDUSER, gh_perms_gatefile(&thread.perms, thread.safe_id, fd, GH_PERMFS_CREATEFILE, NULL));
 
     // because previous prompt was REJECTED AND REMEMBER, next attempt returns rejected by policy instead of rejected by user
-    ghr_asserterr(GHR_PERMS_REJECTEDPOLICY, gh_perms_gatefile(&thread, fd, GH_PERMFS_CREATEFILE, NULL));
+    ghr_asserterr(GHR_PERMS_REJECTEDPOLICY, gh_perms_gatefile(&thread.perms, thread.safe_id, fd, GH_PERMFS_CREATEFILE, NULL));
 
     // WRITE is explicitly 'children reject' under /tmp
-    ghr_asserterr(GHR_PERMS_REJECTEDPOLICY, gh_perms_gatefile(&thread, fd, GH_PERMFS_WRITE, NULL));
-    ghr_assert(gh_perms_gatefile(&thread, fd, GH_PERMFS_READ, NULL));
+    ghr_asserterr(GHR_PERMS_REJECTEDPOLICY, gh_perms_gatefile(&thread.perms, thread.safe_id, fd, GH_PERMFS_WRITE, NULL));
+    ghr_assert(gh_perms_gatefile(&thread.perms, thread.safe_id, fd, GH_PERMFS_READ, NULL));
     ghr_assert(gh_pathfd_close(fd));
 
     // TESTING PERMISSIONS ON /foobar.txt
-    ghr_assert(gh_pathfd_open(AT_FDCWD, "/foobar.txt", &fd));
+    ghr_assert(gh_pathfd_open(AT_FDCWD, "/foobar.txt", &fd, false));
 
     // READ on /foobar.txt is 'self accept'
-    ghr_assert(gh_perms_gatefile(&thread, fd, GH_PERMFS_READ, NULL));
+    ghr_assert(gh_perms_gatefile(&thread.perms, thread.safe_id, fd, GH_PERMFS_READ, NULL));
 
     assert(write(pipefd[1], "n\n", 2) == 2); // force next simpletui request to REJECT
 
     // no mode other than READ is specified on /foobar.txt, so default action is used (prompt), prompt will return REJECT
-    ghr_asserterr(GHR_PERMS_REJECTEDUSER, gh_perms_gatefile(&thread, fd, GH_PERMFS_CREATEFILE, NULL));
+    ghr_asserterr(GHR_PERMS_REJECTEDUSER, gh_perms_gatefile(&thread.perms, thread.safe_id, fd, GH_PERMFS_CREATEFILE, NULL));
 
     assert(close(permfd) >= 0);
 

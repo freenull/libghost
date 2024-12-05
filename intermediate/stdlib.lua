@@ -281,6 +281,9 @@ local ghfile_mt = {
 }
 
 function ghfile_mt.__tostring(self)
+    if self._ptr == nil then
+        return "file (closed)"
+    end
     return "file (0x" .. tostring(self._ptr):sub(18) .. ")"
 end
 
@@ -387,14 +390,8 @@ ghost_io.lines = function(filename)
 
     local iter = f:lines()
 
-    -- print("CREATEITER", f)
-    -- print("CREATEITER", f._ptr)
-
     return function()
         local line = iter()
-        -- if line == nil and filename ~= nil then
-        --     f:close()
-        -- end
         return line
     end
 end
@@ -434,8 +431,12 @@ ghost_io.output = function(file)
     end
 end
 
-ghost_io.popen = function()
-    error("popen is currently not supported")
+ghost_io.popen = function(path, mode)
+    -- mode is ignored, returned file is a pty
+    
+    local fd = ghost.call("ghost.popen", nil, path)
+    local fileptr = ffi.C.fdopen(fd, "r")
+    return FILE(fileptr)
 end
 
 ghost_io.read = function(...)
@@ -494,15 +495,17 @@ end
 
 local lua_os = require("os")
 
-ghost.os.clock = unimplemented
-ghost.os.date = unimplemented
-ghost.os.difftime = unimplemented
-ghost.os.execute = unimplemented
+ghost_os.clock = unimplemented
+ghost_os.date = unimplemented
+ghost_os.difftime = unimplemented
+ghost_os.execute = function(cmd)
+    return ghost.call("ghost.execute", "int", cmd)
+end
 
-ghost.os.exit = os.exit
-ghost.os.getenv = os.getenv
+ghost_os.exit = os.exit
+ghost_os.getenv = os.getenv
 
-ghost.os.remove = function(path)
+ghost_os.remove = function(path)
     local ok, fd = pcall(function()
         return ghost.call("ghost.remove", nil, path)
     end)
@@ -514,11 +517,11 @@ ghost.os.remove = function(path)
     return true
 end
 
-ghost.os.rename = unimplemented
-ghost.os.setlocale = os.setlocale
-ghost.os.time = unimplemented
+ghost_os.rename = unimplemented
+ghost_os.setlocale = os.setlocale
+ghost_os.time = unimplemented
 
-ghost.os.tmpname = function(prefix)
+ghost_os.tmpname = function(prefix)
     prefix = tostring(prefix)
 
     local ok, path, fd = pcall(function()

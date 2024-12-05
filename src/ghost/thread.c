@@ -626,7 +626,9 @@ gh_result gh_thread_call(gh_thread * thread, const char * name, gh_thread_callfr
     GH_IPCMSG_BUFFER(response_msgbuf);
     res = gh_ipc_recv(&thread->ipc, (gh_ipcmsg *)response_msgbuf, GH_THREAD_LUAINFO_TIMEOUTMS);
     if (ghr_iserr(res)) return res;
-    if (((gh_ipcmsg *)response_msgbuf)->type != GH_IPCMSG_LUAINFO) return GHR_THREAD_EXPECTEDLUAINFO;
+    if (((gh_ipcmsg *)response_msgbuf)->type != GH_IPCMSG_LUAINFO) {
+        return GHR_THREAD_EXPECTEDLUAINFO;
+    }
 
     int script_id = ((gh_ipcmsg_luainfo *)response_msgbuf)->script_id;
     gh_threadnotif_script script_result = {0};

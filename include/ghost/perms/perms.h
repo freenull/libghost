@@ -20,6 +20,7 @@
 #include <ghost/perms/procfd.h>
 #include <ghost/perms/prompt.h>
 #include <ghost/perms/permfs.h>
+#include <ghost/perms/permexec.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -68,20 +69,26 @@ typedef struct {
 #define GH_PERMS_MAXGENERIC 16
 
 typedef struct {
+    gh_procfd procfd;
+
     gh_permprompter prompter;
     gh_permfs filesystem;
+    gh_permexec exec;
+
     size_t generic_count;
     gh_permgeneric_instance generic[GH_PERMS_MAXGENERIC];
 } gh_perms;
 
 gh_result gh_perms_ctor(gh_perms * perms, gh_alloc * alloc, gh_permprompter prompter);
 gh_result gh_perms_dtor(gh_perms * perms);
-gh_result gh_perms_gatefile(gh_thread * thread, gh_pathfd fd, gh_permfs_mode mode, const char * hint);
-gh_result gh_perms_fsrequest(gh_thread * thread, gh_pathfd fd, gh_permfs_mode self_mode, gh_permfs_mode children_mode, const char * hint, bool * out_wouldprompt);
+gh_result gh_perms_gatefile(gh_perms * perms, const char * safe_id, gh_pathfd fd, gh_permfs_mode mode, const char * hint);
+gh_result gh_perms_fsrequest(gh_perms * perms, const char * safe_id, gh_pathfd fd, gh_permfs_mode self_mode, gh_permfs_mode children_mode, const char * hint, bool * out_wouldprompt);
+gh_result gh_perms_gateexec(gh_perms * perms, const char * safe_id, gh_pathfd exe_fd, char * const * argv, char * const * envp);
 
 gh_result gh_perms_readfd(gh_perms * perms, int fd, gh_permparser_error * out_parsererror);
 gh_result gh_perms_readbuffer(gh_perms * perms, const char * buffer, size_t buffer_len, gh_permparser_error * out_parsererror);
 gh_result gh_perms_write(gh_perms * perms, int fd);
+gh_result gh_perms_writeatomic(gh_perms * perms, int fd);
 
 gh_result gh_perms_registergeneric(gh_perms * perms, const char * id, const gh_permgeneric * generic);
 void * gh_perms_getgeneric(gh_perms * perms, const char * id);

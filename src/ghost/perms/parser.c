@@ -81,6 +81,8 @@ gh_result gh_permparser_ctorfd(gh_permparser * parser, gh_alloc * alloc, int fd)
 
     size_t file_size = (size_t)lseek_res;
 
+    if (file_size == 0) return gh_permparser_ctorbuffer(parser, alloc, "", 0);
+
     void * map = mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fd, 0);
     if (map == MAP_FAILED) return ghr_errno(GHR_PERMPARSER_FAILEDMMAP);
 

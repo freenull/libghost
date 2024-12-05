@@ -25,7 +25,7 @@ typedef enum {
 
 typedef struct {
     int fd;
-    int indent;
+    int scope;
 
     gh_permwriter_layer layer;
 } gh_permwriter;

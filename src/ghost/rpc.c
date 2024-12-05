@@ -238,7 +238,19 @@ gh_result gh_rpc_respondtomsg(gh_rpc * rpc, gh_ipcmsg_functioncall * funccall_ms
     if (!ghr_isok(frame->result)) ret_msg.fd = -1;
 
     gh_result res = gh_ipc_send(&frame->thread->ipc, (gh_ipcmsg*)&ret_msg, sizeof(gh_ipcmsg_functionreturn));
-    if (ghr_iserr(res)) return res;
+    if (ghr_iserr(res)) {
+        // If we failed here, the remote process will be stuck waiting for a LUARETURN
+        // The reason for the failure may concern *specifically* the file descriptor
+        // If it does, we try to send a message again without the FD.
+        if (ghr_is(res, GHR_IPC_SENDMSGFAIL) && ghr_frag_errno(res) == EBADF) {
+            ret_msg.result = GHR_RPC_INVALIDFD;
+            ret_msg.fd = -1;
+            frame->fd = -1; // prevent trying to close the invalid FD
+            res = gh_ipc_send(&frame->thread->ipc, (gh_ipcmsg*)&ret_msg, sizeof(gh_ipcmsg_functionreturn));
+        }
+
+        if (ghr_iserr(res)) return res;
+    }
 
     if (frame->fd >= 0) {
         int close_res = close(frame->fd);

@@ -5,7 +5,7 @@
 #include <ghost/perms/writer.h>
 
 gh_permwriter gh_permwriter_new(int fd) {
-    return (gh_permwriter) { .fd = fd, .indent = 0, .layer = GH_PERMWRITER_GROUPRESOURCE };
+    return (gh_permwriter) { .fd = fd, .scope = 0, .layer = GH_PERMWRITER_GROUPRESOURCE };
 }
 
 #define GH_PERMWRITER_WRITEORRETURNERR(fd, buf, size) do { \
@@ -15,7 +15,7 @@ gh_permwriter gh_permwriter_new(int fd) {
     } while (0)
 
 static gh_result permwriter_printindent(gh_permwriter * writer) {
-    for (int i = 0; i < writer->indent; i++) {
+    for (int i = 0; i < writer->scope; i++) {
         GH_PERMWRITER_WRITEORRETURNERR(writer->fd, "    ", 4);
     }
 
@@ -33,14 +33,14 @@ gh_result gh_permwriter_beginresource(gh_permwriter * writer, const char * group
     GH_PERMWRITER_WRITEORRETURNERR(writer->fd, resource, resource_len);
     GH_PERMWRITER_WRITEORRETURNERR(writer->fd, " {\n", 3);
 
-    writer->indent += 1;
+    writer->scope += 1;
     writer->layer = GH_PERMWRITER_ENTRY;
 
     return GHR_OK;
 }
 
 gh_result gh_permwriter_endresource(gh_permwriter * writer) {
-    if (writer->indent > 0) writer->indent -= 1;
+    if (writer->scope > 0) writer->scope -= 1;
 
     permwriter_printindent(writer);
 
@@ -64,7 +64,7 @@ gh_result gh_permwriter_beginentry(gh_permwriter * writer, const char * entry, s
     permwriter_writeescaped(writer, entry, entry_len);
     GH_PERMWRITER_WRITEORRETURNERR(writer->fd, "\" {\n", 4);
 
-    writer->indent += 1;
+    writer->scope += 1;
     writer->layer = GH_PERMWRITER_ENTRY;
 
     return GHR_OK;
@@ -77,7 +77,7 @@ gh_result gh_permwriter_endentry(gh_permwriter * writer) {
 
     writer->layer = GH_PERMWRITER_GROUPRESOURCE;
 
-    if (writer->indent > 0) writer->indent -= 1;
+    if (writer->scope > 0) writer->scope -= 1;
     permwriter_printindent(writer);
     GH_PERMWRITER_WRITEORRETURNERR(writer->fd, "}\n", 2);
 

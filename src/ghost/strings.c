@@ -50,11 +50,12 @@ void gh_str_trimrightchar(gh_str * str, char c) {
     }
 }
 
-void gh_str_insertnull(gh_str * str) {
-    assert(str->size < str->capacity);
+bool gh_str_insertnull(gh_str * str) {
+    if (str->size >= str->capacity) return false;
 
     str->buffer[str->size] = '\0';
     str->size += 1;
+    return true;
 }
 
 bool gh_str_rpos(gh_str str, char c, size_t * out_pos) {
@@ -68,6 +69,16 @@ bool gh_str_rpos(gh_str str, char c, size_t * out_pos) {
     }
 
     return false;
+}
+
+bool gh_str_appendchar(gh_str * str, char c) {
+    size_t remaining = str->capacity - str->size;
+    if (remaining < 1) return false;
+
+    str->buffer[str->size] = c;
+    str->size += 1;
+
+    return true;
 }
 
 bool gh_str_appendc(gh_str * str, const char * s, size_t size, bool allow_trunc) {

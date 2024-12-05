@@ -1,0 +1,8 @@
+local f = io.popen("yes")
+print("GOT YES FILE:", f)
+print("yes out: ", f:read(3))
+print("one yes line: ", f:read("*l"))
+print("one yes line: ", f:read("*l"))
+print("one yes line: ", f:read("*l"))
+f:close()
+print("YES FILE:", f)

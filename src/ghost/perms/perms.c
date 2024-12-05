@@ -5,6 +5,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <stddef.h>
+#include <sys/sendfile.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <ghost/thread.h>
@@ -22,17 +24,28 @@ gh_result gh_perms_ctor(gh_perms * perms, gh_alloc * alloc, gh_permprompter prom
     perms->generic_count = 0;
     perms->prompter = prompter;
 
-    gh_result res = gh_permfs_ctor(&perms->filesystem, alloc);
+    gh_result res = gh_procfd_ctor(&perms->procfd, alloc);
     if (ghr_iserr(res)) return res;
-    return GHR_OK;
+
+    res = gh_permfs_ctor(&perms->filesystem, alloc);
+    if (ghr_iserr(res)) return res;
+
+    res = gh_permexec_ctor(&perms->exec, alloc);
+    if (ghr_iserr(res)) return res;
+
+    return res;
 }
 
-gh_result gh_perms_gatefile(gh_thread * thread, gh_pathfd fd, gh_permfs_mode mode, const char * hint) {
-    return gh_permfs_gatefile(&thread->perms.filesystem, &thread->perms.prompter, thread->safe_id, fd, mode, hint);
+gh_result gh_perms_gatefile(gh_perms * perms, const char * safe_id, gh_pathfd fd, gh_permfs_mode mode, const char * hint) {
+    return gh_permfs_gatefile(&perms->filesystem, &perms->prompter, &perms->procfd, safe_id, fd, mode, hint);
 }
 
-gh_result gh_perms_fsrequest(gh_thread * thread, gh_pathfd fd, gh_permfs_mode self_mode, gh_permfs_mode children_mode, const char * hint, bool * out_wouldprompt) {
-    return gh_permfs_requestnode(&thread->perms.filesystem, &thread->perms.prompter,thread->safe_id, fd, self_mode, children_mode, hint, out_wouldprompt);
+gh_result gh_perms_fsrequest(gh_perms * perms, const char * safe_id, gh_pathfd fd, gh_permfs_mode self_mode, gh_permfs_mode children_mode, const char * hint, bool * out_wouldprompt) {
+    return gh_permfs_requestnode(&perms->filesystem, &perms->prompter, &perms->procfd, safe_id, fd, self_mode, children_mode, hint, out_wouldprompt);
+}
+
+gh_result gh_perms_gateexec(gh_perms * perms, const char * safe_id, gh_pathfd exe_fd, char * const * argv, char * const * envp) {
+    return gh_permexec_gate(&perms->exec, &perms->prompter, &perms->procfd, safe_id, exe_fd, argv, envp);
 }
 
 gh_result gh_perms_dtor(gh_perms * perms) {
@@ -47,7 +60,14 @@ gh_result gh_perms_dtor(gh_perms * perms) {
 
     res = gh_permfs_dtor(&perms->filesystem);
     if (ghr_iserr(res)) return res;
-    return GHR_OK;
+
+    res = gh_permexec_dtor(&perms->exec);
+    if (ghr_iserr(res)) return res;
+
+    res = gh_procfd_dtor(&perms->procfd);
+    if (ghr_iserr(res)) return res;
+
+    return res;
 }
 
 static gh_result permgeneric_matches(gh_permparser * parser, gh_permrequest_id group_id, gh_permrequest_id resource_id, void * userdata) {
@@ -77,6 +97,9 @@ static gh_result permgeneric_setfield(gh_permparser * parser, void * entry_voidp
 
 static gh_result perms_parse(gh_perms * perms, gh_permparser * parser, gh_permparser_error * out_parsererror) {
     gh_result res = gh_permfs_registerparser(&perms->filesystem, parser);
+    if (ghr_iserr(res)) return res;
+
+    res = gh_permexec_registerparser(&perms->exec, parser);
     if (ghr_iserr(res)) return res;
 
     for (size_t i = 0; i < perms->generic_count; i++) {
@@ -125,15 +148,23 @@ gh_result gh_perms_readbuffer(gh_perms * perms, const char * buffer, size_t buff
 
 gh_result gh_perms_write(gh_perms * perms, int fd) {
     gh_permwriter writer = gh_permwriter_new(fd);
+
     gh_result res = gh_permfs_write(&perms->filesystem, &writer);
-    if (ghr_iserr(res)) return res;
+    if (ghr_iserr(res)) goto emergency_clear;
+
+    res = gh_permexec_write(&perms->exec, &writer);
+    if (ghr_iserr(res)) goto emergency_clear;
 
     for (size_t i = 0; i < perms->generic_count; i++) {
         gh_permgeneric_instance * instance = perms->generic + i;
         res = instance->vtable->save(instance->instance, &writer, instance->vtable->userdata);
-        if (ghr_iserr(res)) return res;
+        if (ghr_iserr(res)) goto emergency_clear;
     }
     
+    return res;
+
+emergency_clear:
+    if (ftruncate(fd, 0) < 0) res = ghr_errno(GHR_PERMS_EMERGENCYTRUNC);
     return res;
 }
 

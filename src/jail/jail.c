@@ -15,6 +15,7 @@
 #include <sys/socket.h>
 #include <sys/syscall.h>
 #include <sys/resource.h>
+#include <sys/ioctl.h>
 #include <stddef.h>
 #include <unistd.h>
 #include <string.h>
@@ -161,6 +162,14 @@ gh_result gh_jail_lockdown(gh_sandboxoptions * options) {
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_fcntl, 0, 4),
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, (offsetof(struct seccomp_data, args[1]))),
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, F_GETFL, 0, 1),
+        BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW),
+        BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_KILL_PROCESS),
+
+        // When a pseudoterminal is used with fdopen, ioctl with TCGETS
+        // is used instead of the fcntl above
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_ioctl, 0, 4),
+        BPF_STMT(BPF_LD + BPF_W + BPF_ABS, (offsetof(struct seccomp_data, args[1]))),
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, TCGETS, 0, 1),
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW),
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_KILL_PROCESS),
 

@@ -29,6 +29,8 @@ gh_result gh_std_opentemp(gh_thread * thread, const char * prefix, int flags, st
 
 gh_result gh_std_fsrequest(gh_thread * thread, int dirfd, const char * path, gh_permfs_mode self_mode, gh_permfs_mode children_mode, bool * out_wouldprompt);
 
+gh_result gh_std_execute(gh_thread * thread, int dirfd, const char * shellscript, char * const * envp, int * out_exitcode, int * out_ptyfd);
+
 gh_result gh_std_registerinrpc(gh_rpc * rpc);
 
 #ifdef __cplusplus

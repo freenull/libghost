@@ -1,4 +1,7 @@
+#include "ghost/perms/pathfd.h"
+#include "ghost/perms/procfd.h"
 #define _GNU_SOURCE
+#include "ghost/perms/permexec.h"
 #include <fcntl.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -58,8 +61,14 @@ int main(void) {
     int script = open("std.lua", O_RDONLY);
     assert(script >= 0);
     gh_threadnotif_script script_result;
-    gh_result lua_result = gh_thread_runfilesync(&thread, script, &script_result);
+    ghr_assert(gh_thread_runfilesync(&thread, script, &script_result));
+    fprintf(stderr, "AFTER RUN FILE SYNC\n");
     assert(close(script) >= 0);
+
+    fprintf(stderr, "Script result: ");
+    ghr_fputs(stderr, script_result.result);
+
+    fprintf(stderr, "Script error: %s\n", script_result.error_msg);
 
 
     gh_thread_callframe frame;
@@ -96,7 +105,5 @@ int main(void) {
     ghr_fputs(stderr, sandbox_res);
 
     ghr_assert(gh_rpc_dtor(&rpc));
-
-    ghr_assert(lua_result);
     return 0;
 }

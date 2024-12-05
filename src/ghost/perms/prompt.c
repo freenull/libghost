@@ -97,6 +97,7 @@ static gh_result print_generic_description(const gh_permrequest * req, gh_consts
                 if      (strcmp(fragment, "group"   ) == 0) printf("%s", req->group);
                 else if (strcmp(fragment, "resource") == 0) printf("%s", req->resource);
                 else if (strcmp(fragment, "source"  ) == 0) printf("%s", req->source);
+                else if (strcmp(fragment, ""        ) == 0) ;
                 else {
                     const gh_permrequest_field * field = gh_permrequest_getfield(req, fragment);
                     if (field == NULL) return GHR_PERMPROMPT_MISSINGFIELD;
@@ -170,7 +171,7 @@ static gh_result simpletui_prompter(const gh_permrequest * req, void * userdata,
     }
 
     printf("\nIf you accept the request, the script will receive access to the object as specified in the list above.");
-    printf("If you reject the request, the script will not receive any new permissions.\n");
+    printf("\nIf you reject the request, the script will not receive any new permissions.\n");
 
     char input[3] = " ";
     bool first = true;

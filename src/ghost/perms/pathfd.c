@@ -46,12 +46,15 @@ gh_result gh_pathfd_opentrailing(int dirfd, const char * path, gh_pathfd * out_p
     return GHR_OK;
 }
 
-gh_result gh_pathfd_open(int dirfd, const char * path, gh_pathfd * out_pathfd) {
+gh_result gh_pathfd_open(int dirfd, const char * path, gh_pathfd * out_pathfd, gh_pathfd_mode mode) {
     memset(out_pathfd->trailing_name, 0, GH_PATHFD_TRAILINGNAMEMAX * sizeof(char));
 
-    int opath_fd = openat(dirfd, path, O_PATH | O_NOFOLLOW, 0);
+    int extra_flags = 0;
+    if ((mode & GH_PATHFD_RESOLVELINKS) == 0) extra_flags |= O_NOFOLLOW;
+
+    int opath_fd = openat(dirfd, path, O_PATH | extra_flags, 0);
     if (opath_fd < 0) {
-        if (errno == ENOENT) {
+        if ((mode & GH_PATHFD_ALLOWMISSING) != 0 && errno == ENOENT) {
             return gh_pathfd_opentrailing(dirfd, path, out_pathfd);
         } else {
             return ghr_errno(GHR_PATHFD_OPENFAIL);

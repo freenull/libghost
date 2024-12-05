@@ -1,4 +1,7 @@
 #define _GNU_SOURCE
+#include <pty.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
 #include <time.h>
@@ -15,18 +18,18 @@ gh_result gh_std_openat(gh_thread * thread, int dirfd, const char * path, int fl
     gh_perms * perms = &thread->perms;
 
     gh_pathfd pathfd = {0};
-    res = gh_pathfd_open(dirfd, path, &pathfd);
+    res = gh_pathfd_open(dirfd, path, &pathfd, (flags & O_CREAT) != 0);
     if (ghr_iserr(res)) return res;
 
     gh_permfs_mode mode;
     res = gh_permfs_fcntlflags2permfsmode(flags, create_mode, pathfd, &mode);
     if (ghr_iserr(res)) goto close_pathfd;
 
-    res = gh_perms_gatefile(thread, pathfd, mode, NULL);
+    res = gh_perms_gatefile(&thread->perms, thread->safe_id, pathfd, mode, NULL);
     if (ghr_iserr(res)) goto close_pathfd;
 
     int new_fd = -1;
-    res = gh_procfd_reopen(&perms->filesystem.procfd, pathfd, flags, create_mode, &new_fd);
+    res = gh_procfd_reopen(&perms->procfd, pathfd, flags, create_mode, &new_fd);
     if (ghr_iserr(res)) goto close_pathfd;
 
     *out_fd = new_fd;
@@ -79,7 +82,7 @@ gh_result gh_std_unlinkat(gh_thread * thread, int dirfd, const char * path) {
 
     gh_permfs_mode mode = GH_PERMFS_UNLINK;
 
-    res = gh_perms_gatefile(thread, pathfd, mode, NULL);
+    res = gh_perms_gatefile(&thread->perms, thread->safe_id, pathfd, mode, NULL);
     if (ghr_iserr(res)) goto close_pathfd;
 
     if (unlinkat(pathfd.fd, pathfd.trailing_name, 0) < 0) {
@@ -146,18 +149,18 @@ gh_result gh_std_opentemp(gh_thread * thread, const char * prefix, int flags, st
     int new_fd = -1;
 
     gh_pathfd pathfd = {0};
-    res = gh_pathfd_open(tmp_fd, tmp_name, &pathfd);
+    res = gh_pathfd_open(tmp_fd, tmp_name, &pathfd, (flags & O_CREAT) != 0);
     if (ghr_iserr(res)) goto err_close_fd;
 
     gh_permfs_mode mode;
     res = gh_permfs_fcntlflags2permfsmode(flags, 0644, pathfd, &mode);
     if (ghr_iserr(res)) goto err_close_fd;
 
-    res = gh_perms_gatefile(thread, pathfd, mode, "tmpfile");
+    res = gh_perms_gatefile(&thread->perms, thread->safe_id, pathfd, mode, "tmpfile");
     if (ghr_iserr(res)) goto err_close_fd;
 
     gh_abscanonicalpath path;
-    res = gh_procfd_fdpathctor(&thread->perms.filesystem.procfd, pathfd, &path);
+    res = gh_procfd_fdpathctor(&thread->perms.procfd, pathfd, &path);
     if (ghr_iserr(res)) goto err_close_fd;
 
     new_fd = openat(tmp_fd, tmp_name, O_RDWR | O_CREAT, 0);
@@ -171,7 +174,7 @@ gh_result gh_std_opentemp(gh_thread * thread, const char * prefix, int flags, st
     out_tempfile->path[GH_STD_TEMPFILE_PATHMAX - 1] = '\0';
 
 err_dtor_fdpath:
-    inner_res = gh_procfd_fdpathdtor(&thread->perms.filesystem.procfd, &path);
+    inner_res = gh_procfd_fdpathdtor(&thread->perms.procfd, &path);
     if (ghr_iserr(inner_res)) res = inner_res;
 
 err_close_fd:
@@ -219,10 +222,10 @@ gh_result gh_std_fsrequest(gh_thread * thread, int dirfd, const char * path, gh_
     if (self_mode == children_mode && self_mode == GH_PERMFS_NONE) return GHR_STD_INVALIDMODE;
 
     gh_pathfd pathfd = {0};
-    res = gh_pathfd_open(dirfd, path, &pathfd);
+    res = gh_pathfd_open(dirfd, path, &pathfd, true);
     if (ghr_iserr(res)) return res;
 
-    res = gh_perms_fsrequest(thread, pathfd, self_mode, children_mode, "future", out_wouldprompt);
+    res = gh_perms_fsrequest(&thread->perms, thread->safe_id, pathfd, self_mode, children_mode, "future", out_wouldprompt);
     if (ghr_iserr(res)) goto close_pathfd;
 
 close_pathfd:
@@ -294,6 +297,137 @@ static void ghost_fshas(gh_rpc * rpc, gh_rpcframe * frame) {
     gh_rpcframe_returntypedhere(frame, &has_perms);
 }
 
+gh_result gh_std_execute(gh_thread * thread, int dirfd, const char * shellscript, char * const * envp, int * out_exitcode, int * out_ptyfd) {
+    gh_result res = GHR_OK;
+    gh_result inner_res = GHR_OK;
+
+    // C popen(3) is defined as running the argument as a parameter to /bin/sh.
+    // Both Lua and LuaJIT popen behavior is based on popen(3).
+    char * shell_program = "/bin/sh";
+
+    gh_pathfd pathfd = {0};
+    res = gh_pathfd_open(dirfd, shell_program, &pathfd, GH_PATHFD_RESOLVELINKS);
+    if (ghr_iserr(res)) return res;
+
+    char * const argv[] = {
+        shell_program,
+        "-c",
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
+        // RATIONALE: The odd interface of (char * const *) for argv and envp is
+        // caused by the signature of execve. The strings don't have to be mutable.
+
+        (char *)shellscript,
+#pragma GCC diagnostic pop
+        NULL
+    };
+
+    res = gh_perms_gateexec(&thread->perms, thread->safe_id, pathfd, argv, envp);
+    if (ghr_iserr(res)) goto close_pathfd;
+
+    int pty_masterfd = -1;
+    int pty_slavefd = -1;
+
+    if (out_ptyfd != NULL) {
+        if (openpty(&pty_masterfd, &pty_slavefd, NULL, NULL, NULL) < 0) {
+            res = ghr_errno(GHR_STD_SPAWNPTY);
+            goto close_pathfd;
+        }
+        *out_ptyfd = pty_masterfd;
+    }
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        if (out_ptyfd != NULL) {
+            if (close(pty_masterfd) < 0) abort();
+            if (dup2(pty_slavefd, STDIN_FILENO) < 0) abort();
+            if (dup2(pty_slavefd, STDOUT_FILENO) < 0) abort();
+            if (dup2(pty_slavefd, STDERR_FILENO) < 0) abort();
+            if (close(pty_slavefd) < 0) abort();
+        }
+        int exec_res = execveat(pathfd.fd, "", argv, envp, AT_EMPTY_PATH);
+        if (exec_res < 0) {
+            abort();
+        }
+    }
+
+    if (out_ptyfd != NULL && close(pty_slavefd) < 0) {
+        res = ghr_errno(GHR_STD_SPAWNPTYCLOSE);
+        goto close_pathfd;
+    }
+
+    if (out_exitcode != NULL) {
+        int status = 0;
+        if (waitpid(pid, &status, 0) < 0) {
+            res = ghr_errno(GHR_STD_SPAWNWAIT);
+            goto close_pathfd;
+        }
+
+        if (WIFEXITED(status)) {
+            *out_exitcode = WEXITSTATUS(status);
+        } else if (WIFSIGNALED(status)) {
+            *out_exitcode = 128 + WTERMSIG(status);
+        } else {
+            *out_exitcode = 255;
+        }
+    }
+
+close_pathfd:
+    inner_res = gh_pathfd_close(pathfd);
+    if (ghr_iserr(inner_res)) res = inner_res;
+
+    return res;
+}
+
+static void ghost_execute(gh_rpc * rpc, gh_rpcframe * frame) {
+    (void)rpc;
+
+    char * cmd_buf;
+    size_t cmd_size;
+    if (!gh_rpcframe_argbuf(frame, 0, &cmd_buf, &cmd_size)) {
+        gh_rpcframe_failhere(frame, ghr_errnoval(GHR_RPCF_ARG0, EINVAL));
+    }
+
+    if (cmd_size > GH_PERMEXEC_CMDLINEMAX) gh_rpcframe_failhere(frame, ghr_errnoval(GHR_RPCF_ARG0, EFBIG));
+
+    if (cmd_size > 0) {
+        cmd_buf[cmd_size] = '\0';
+    }
+
+    int exitcode = 255;
+    gh_result res = gh_std_execute(frame->thread, AT_FDCWD, cmd_buf, environ, NULL, NULL);
+    if (ghr_iserr(res)) {
+        gh_rpcframe_failhere(frame, res);
+    }
+
+    gh_rpcframe_returntypedhere(frame, &exitcode);
+}
+
+static void ghost_popen(gh_rpc * rpc, gh_rpcframe * frame) {
+    (void)rpc;
+
+    char * cmd_buf;
+    size_t cmd_size;
+    if (!gh_rpcframe_argbuf(frame, 0, &cmd_buf, &cmd_size)) {
+        gh_rpcframe_failhere(frame, ghr_errnoval(GHR_RPCF_ARG0, EINVAL));
+    }
+
+    if (cmd_size > GH_PERMEXEC_CMDLINEMAX) gh_rpcframe_failhere(frame, ghr_errnoval(GHR_RPCF_ARG0, EFBIG));
+
+    if (cmd_size > 0) {
+        cmd_buf[cmd_size - 1] = '\0';
+    }
+
+    int ptyfd = -1;
+    gh_result res = gh_std_execute(frame->thread, AT_FDCWD, cmd_buf, environ, NULL, &ptyfd);
+    if (ghr_iserr(res)) {
+        gh_rpcframe_failhere(frame, res);
+    }
+
+    printf("RETURNING FD: %d\n", ptyfd);
+    gh_rpcframe_returnfdhere(frame, ptyfd);
+}
+
 gh_result gh_std_registerinrpc(gh_rpc * rpc) {
     gh_result res;
 
@@ -310,6 +444,12 @@ gh_result gh_std_registerinrpc(gh_rpc * rpc) {
     if (ghr_iserr(res)) return res;
 
     res = gh_rpc_register(rpc, "ghost.perm.fshas", ghost_fshas, GH_RPCFUNCTION_THREADSAFE);
+    if (ghr_iserr(res)) return res;
+
+    res = gh_rpc_register(rpc, "ghost.execute", ghost_execute, GH_RPCFUNCTION_THREADSAFE);
+    if (ghr_iserr(res)) return res;
+
+    res = gh_rpc_register(rpc, "ghost.popen", ghost_popen, GH_RPCFUNCTION_THREADSAFE);
     if (ghr_iserr(res)) return res;
 
     return res;
