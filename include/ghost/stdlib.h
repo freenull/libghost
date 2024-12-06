@@ -18,6 +18,9 @@ extern "C" {
 #endif
 
 gh_result gh_std_openat(gh_thread * thread, int dirfd, const char * path, int flags, mode_t create_mode, int * out_fd);
+
+gh_result gh_std_rename(gh_thread * thread, int from_dirfd, const char * from_path, int to_dirfd, const char * to_path);
+
 gh_result gh_std_unlinkat(gh_thread * thread, int dirfd, const char * path);
 
 #define GH_STD_TEMPFILE_PATHMAX 4096

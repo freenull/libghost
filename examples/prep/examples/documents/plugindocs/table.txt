@@ -1,0 +1,8 @@
+## table.txt
+
+Can generate neat monospace tables with #table.
+First parameter must be the number of columns, then each parameter is the next cell (left-to-right, top-to-bottom).
+Parameters are separated by ## inside the parentheses.
+
+Example:
+    #table(3 # a # b # c # d # e # f # g # h # i)

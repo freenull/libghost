@@ -267,7 +267,6 @@ static gh_result thread_handlemsg(gh_thread * thread, gh_ipcmsg * msg, gh_thread
             strncpy(notif->script.error_msg, result_msg->error_msg, GH_THREADNOTIF_SCRIPT_ERRORMSGMAX);
             notif->script.error_msg[GH_THREADNOTIF_SCRIPT_ERRORMSGMAX - 1] = '\0';
             notif->script.call_return_ptr = result_msg->return_ptr;
-            printf("RECV return_ptr %zx\n", notif->script.call_return_ptr);
         }
         return GHR_OK;
 
@@ -604,7 +603,9 @@ gh_result gh_thread_callframe_dtor(gh_thread_callframe * frame) {
     return gh_fdmem_dtor(&frame->fdmem);
 }
 
-gh_result gh_thread_call(gh_thread * thread, const char * name, gh_thread_callframe * frame) {
+gh_result gh_thread_call(gh_thread * thread, const char * name, gh_thread_callframe * frame, gh_threadnotif_script * out_script_result) {
+    if (out_script_result != NULL) *out_script_result = (gh_threadnotif_script){0};
+
     size_t name_len = strlen(name);
     if (name_len > GH_IPCMSG_LUACALL_NAMEMAX - 1) return GHR_THREAD_CALLNAMEMAX;
 
@@ -635,5 +636,6 @@ gh_result gh_thread_call(gh_thread * thread, const char * name, gh_thread_callfr
     res = thread_syncscript(thread, script_id, &script_result);
     if (ghr_iserr(res)) return res;
 
+    if (out_script_result != NULL) *out_script_result = script_result;
     return gh_thread_callframe_loadreturnvalue(frame, script_result.call_return_ptr);
 }

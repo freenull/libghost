@@ -77,7 +77,7 @@ gh_result gh_permexec_hashlist_dtor(gh_permexec_hashlist * list) {
 }
 
 gh_result gh_permexec_ctor(gh_permexec * permexec, gh_alloc * alloc) {
-    *permexec = (gh_permexec) {0};
+    *permexec = (gh_permexec) { .default_mode = GH_PERMEXEC_REJECT };
     return gh_permexec_hashlist_ctor(&permexec->hashlist, alloc);
 }
 
@@ -266,7 +266,7 @@ gh_result gh_permexec_gate(gh_permexec * permexec, gh_permprompter * prompter, g
     res = gh_permexec_hashlist_tryget(&permexec->hashlist, &combined_hash, &entry);
     if (ghr_iserr(res)) return res;
 
-    gh_permexec_mode mode = GH_PERMEXEC_PROMPT;
+    gh_permexec_mode mode = permexec->default_mode;
     if (entry != NULL) mode = entry->mode;
 
     if (mode == GH_PERMEXEC_ACCEPT) return GHR_OK;
@@ -380,7 +380,7 @@ static gh_result permexecparser_newentry(gh_permparser * parser, gh_conststr val
     if (ghr_iserr(res)) return res;
 
     res = gh_permexec_hashlist_add(&permexec->hashlist, &(gh_permexec_entry) {
-        .mode = GH_PERMEXEC_PROMPT,
+        .mode = permexec->default_mode,
         .combined_hash = combined_hash
     });
     if (ghr_iserr(res)) return res;

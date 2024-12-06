@@ -78,7 +78,7 @@ typedef struct {
     gh_rpc * rpc;
     gh_permprompter prompter;
     char name[GH_THREAD_MAXNAME];
-    char safe_id[GH_THREAD_MAXNAME];
+    char safe_id[GH_THREAD_MAXSAFEID];
     int default_timeout_ms;
 } gh_threadoptions;
 
@@ -121,7 +121,7 @@ bool gh_thread_callframe_getstring(gh_thread_callframe * frame, const char ** ou
 gh_result gh_thread_callframe_loadreturnvalue(gh_thread_callframe * frame, gh_fdmem_ptr return_value_ptr);
 gh_result gh_thread_callframe_dtor(gh_thread_callframe * frame);
 
-gh_result gh_thread_call(gh_thread * thread, const char * name, gh_thread_callframe * frame);
+gh_result gh_thread_call(gh_thread * thread, const char * name, gh_thread_callframe * frame, gh_threadnotif_script * out_script_result);
 
 
 #ifdef __cplusplus

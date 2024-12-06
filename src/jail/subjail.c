@@ -26,10 +26,17 @@ int gh_global_subjail_idx = -1;
 int gh_global_script_idx = -1;
 lua_State * L;
 
-static gh_result lua_poperror(int r) {
+static gh_result lua_poperror(int r, char * error_msg_buf) {
     const char * s = lua_tostring(L, -1);
     lua_pop(L, 1);
-    fprintf(stderr, "lua error: %s\n", s);
+    if (error_msg_buf != NULL) {
+        strncpy(error_msg_buf, s, GH_IPCMSG_LUARESULT_ERRORMSGMAX - 1);
+        error_msg_buf[GH_IPCMSG_LUARESULT_ERRORMSGMAX - 1] = '\0';
+    } else {
+        gh_jail_printf("lua error: %s\n", s);
+    }
+
+
     return gh_lua2result(r);
 }
 
@@ -151,12 +158,14 @@ static gh_result lua_sethostvariable(gh_ipc * ipc, gh_ipcmsg_luahostvariable * m
     gh_result res = lua_sendinfomsg(ipc, &script_id);
     if (ghr_iserr(res)) return res;
 
-    lua_getglobal(L, "host");
+    int prev_top = lua_gettop(L);
+
+    lua_getglobal(L, "__ghost_host");
     if (lua_type(L, -1) == LUA_TNIL) {
         lua_pop(L, 1);
         lua_createtable(L, 0, 1);
         lua_pushvalue(L, -1);
-        lua_setglobal(L, "host");
+        lua_setglobal(L, "__ghost_host");
     }
 
     if (msg->table_index > 0) {
@@ -194,11 +203,8 @@ static gh_result lua_sethostvariable(gh_ipc * ipc, gh_ipcmsg_luahostvariable * m
     }
 
     lua_settable(L, -3);
-    lua_pop(L, 1);
 
-    if (msg->table_index > 0) {
-        lua_pop(L, 1);
-    }
+    lua_settop(L, prev_top);
 
     gh_ipcmsg_luaresult result_msg = {
         .type = GH_IPCMSG_LUARESULT,
@@ -306,17 +312,24 @@ static gh_result lua_callfunction(gh_ipc * ipc, gh_ipcmsg_luacall * msg) {
     
     int prev_top = lua_gettop(L);
 
-    gh_fdmem_ptr return_ptr = 0;
+    gh_ipcmsg_luaresult result_msg = {
+        .type = GH_IPCMSG_LUARESULT,
+        .result = GHR_OK,
+        .script_id = script_id,
+        .error_msg = {0},
+        
+        .return_ptr = 0
+    };
 
-    lua_getglobal(L, "callbacks");
+    lua_getglobal(L, "__ghost_callbacks");
     if (lua_type(L, -1) == LUA_TNIL) {
-        res = GHR_JAIL_LUACALLMISSING;
+        result_msg.result = GHR_JAIL_LUACALLMISSING;
         goto respond;
     }
 
     lua_getfield(L, -1, msg->name);
     if (lua_type(L, -1) == LUA_TNIL) {
-        res = GHR_JAIL_LUACALLMISSING;
+        result_msg.result = GHR_JAIL_LUACALLMISSING;
         goto respond;
     }
 
@@ -327,7 +340,7 @@ static gh_result lua_callfunction(gh_ipc * ipc, gh_ipcmsg_luacall * msg) {
 
         gh_variant * param = (gh_variant *)gh_fdmem_realptr(&mem, param_ptr, 1);
         if (param == NULL) {
-            res = GHR_JAIL_LUACALLPARAM;
+            result_msg.result = GHR_JAIL_LUACALLPARAM;
             goto respond;
         }
 
@@ -339,26 +352,19 @@ static gh_result lua_callfunction(gh_ipc * ipc, gh_ipcmsg_luacall * msg) {
 
     int r = gh_lua_pcall(L, nargs, 1);
     if (r != 0) {
-        res = lua_poperror(r);
+        result_msg.result = lua_poperror(r, result_msg.error_msg);
         goto respond;
     }
 
-    res = lua_callfunction_getreturn(ipc, &mem, &return_ptr);
+    res = lua_callfunction_getreturn(ipc, &mem, &result_msg.return_ptr);
     if (ghr_iserr(res)) {
         goto respond;
     }
 
 respond:
-    lua_settop(L, prev_top);
+    if (ghr_iserr(res)) result_msg.result = res;
 
-    gh_ipcmsg_luaresult result_msg = {
-        .type = GH_IPCMSG_LUARESULT,
-        .result = res,
-        .script_id = script_id,
-        .error_msg = {0},
-        
-        .return_ptr = return_ptr
-    };
+    lua_settop(L, prev_top);
 
     ipcfdmem_dtor_res = gh_fdmem_dtor(&mem);
 
@@ -376,39 +382,39 @@ static bool message_recv(gh_ipc * ipc, gh_ipcmsg * msg) {
     case GH_IPCMSG_HELLO: ghr_fail(GHR_JAIL_MULTIHELLO); break;
 
     case GH_IPCMSG_QUIT:
-        fprintf(stderr, "subjail %d: received request to exit\n", gh_global_subjail_idx);
+        gh_jail_printf("subjail %d: received request to exit\n", gh_global_subjail_idx);
         return true;
 
     case GH_IPCMSG_LUASTRING:
-        fprintf(stderr, "subjail %d: running lua (string)\n", gh_global_subjail_idx);
+        gh_jail_printf("subjail %d: running lua (string)\n", gh_global_subjail_idx);
         ghr_assert(lua_executestring(ipc, ((gh_ipcmsg_luastring *)msg)->content));
-        fprintf(stderr, "subjail %d: finished running lua (string)\n", gh_global_subjail_idx);
+        gh_jail_printf("subjail %d: finished running lua (string)\n", gh_global_subjail_idx);
 
         return false;
 
     case GH_IPCMSG_LUAFILE: {
-        fprintf(stderr, "subjail %d: running lua (file)\n", gh_global_subjail_idx);
+        gh_jail_printf("subjail %d: running lua (file)\n", gh_global_subjail_idx);
         gh_ipcmsg_luafile * file_msg = (gh_ipcmsg_luafile *)msg;
         ghr_assert(lua_executefile(ipc, file_msg->fd, file_msg->chunk_name));
-        fprintf(stderr, "subjail %d: finished running lua (file)\n", gh_global_subjail_idx);
+        gh_jail_printf("subjail %d: finished running lua (file)\n", gh_global_subjail_idx);
 
         return false;
     }
 
     case GH_IPCMSG_LUAHOSTVARIABLE: {
         gh_ipcmsg_luahostvariable * global_msg = (gh_ipcmsg_luahostvariable *)msg;
-        fprintf(stderr, "subjail %d: setting lua host variable '%s'\n", gh_global_subjail_idx, global_msg->name);
+        gh_jail_printf("subjail %d: setting lua host variable '%s'\n", gh_global_subjail_idx, global_msg->name);
         ghr_assert(lua_sethostvariable(ipc, global_msg));
-        fprintf(stderr, "subjail %d: finished setting lua host variable '%s'\n", gh_global_subjail_idx, global_msg->name);
+        gh_jail_printf("subjail %d: finished setting lua host variable '%s'\n", gh_global_subjail_idx, global_msg->name);
 
         return false;
     }
 
     case GH_IPCMSG_LUACALL: {
         gh_ipcmsg_luacall * call_msg = (gh_ipcmsg_luacall *)msg;
-        fprintf(stderr, "subjail %d: calling lua function '%s'\n", gh_global_subjail_idx, call_msg->name);
+        gh_jail_printf("subjail %d: calling lua function '%s'\n", gh_global_subjail_idx, call_msg->name);
         ghr_assert(lua_callfunction(ipc, call_msg));
-        fprintf(stderr, "subjail %d: finished calling lua function '%s'\n", gh_global_subjail_idx, call_msg->name);
+        gh_jail_printf("subjail %d: finished calling lua function '%s'\n", gh_global_subjail_idx, call_msg->name);
 
         return false;
     }
@@ -423,7 +429,7 @@ static bool message_recv(gh_ipc * ipc, gh_ipcmsg * msg) {
     case GH_IPCMSG_FUNCTIONRETURN: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
 
     default:
-        fprintf(stderr, "subjail %d: received unknown message of type %d\n", gh_global_subjail_idx, (int)msg->type);
+        gh_jail_printf("subjail %d: received unknown message of type %d\n", gh_global_subjail_idx, (int)msg->type);
         ghr_fail(GHR_JAIL_UNKNOWNMESSAGE);
         break;
     }
@@ -525,30 +531,32 @@ static gh_result lua_init(gh_ipc * ipc) {
     if (r != 0) goto err;
 
 err:
-    if (r != 0) return lua_poperror(r);
+    if (r != 0) return lua_poperror(r, NULL);
 
     return GHR_OK;
 }
 
 int gh_subjail_main(gh_ipc * ipc, int parent_pid, gh_ipc * parent_ipc) {
+    (void)parent_pid;
+
     ghr_assert(gh_ipc_dtor(parent_ipc));
 
-    fprintf(stderr, "subjail %d: started by jail pid %d\n", gh_global_subjail_idx, parent_pid);
+    gh_jail_printf("subjail %d: started by jail pid %d\n", gh_global_subjail_idx, parent_pid);
 
-    fprintf(stderr, "subjail %d: installing second seccomp filter\n", gh_global_subjail_idx);
+    gh_jail_printf("subjail %d: installing second seccomp filter\n", gh_global_subjail_idx);
     ghr_assert(gh_subjail_lockdown());
-    fprintf(stderr, "subjail %d: security policy in effect\n", gh_global_subjail_idx);
+    gh_jail_printf("subjail %d: security policy in effect\n", gh_global_subjail_idx);
 
     L = luaL_newstate();
 
     gh_result res = lua_init(ipc);
     if (ghr_iserr(res)) {
-        fprintf(stderr, "subjail %d: failed initializing lua: ", gh_global_subjail_idx);
+        gh_jail_printf("subjail %d: failed initializing lua: ", gh_global_subjail_idx);
         ghr_fputs(stderr, res);
         return 1;
     }
 
-    fprintf(stderr, "subjail %d: luajit ready\n", gh_global_subjail_idx);
+    gh_jail_printf("subjail %d: luajit ready\n", gh_global_subjail_idx);
 
     gh_ipcmsg_subjailalive subjailalive_msg;
     subjailalive_msg.type = GH_IPCMSG_SUBJAILALIVE;
@@ -556,26 +564,26 @@ int gh_subjail_main(gh_ipc * ipc, int parent_pid, gh_ipc * parent_ipc) {
     subjailalive_msg.pid = getpid();
     ghr_assert(gh_ipc_send(ipc, (gh_ipcmsg *)&subjailalive_msg, sizeof(gh_ipcmsg_subjailalive)));
 
-    fprintf(stderr, "subjail %d: waiting for hello\n", gh_global_subjail_idx);
+    gh_jail_printf("subjail %d: waiting for hello\n", gh_global_subjail_idx);
 
     char msg_buf[GH_IPCMSG_MAXSIZE];
     gh_ipcmsg * msg = (gh_ipcmsg *)msg_buf;
     res = gh_ipc_recv(ipc, msg, GH_JAIL_HELLOTIMEOUTMS);
 
     if (res == GHR_IPC_RECVMSGTIMEOUT) {
-        fprintf(stderr, "subjail %d: timed out while waiting for hello message, bailing\n", gh_global_subjail_idx);
+        gh_jail_printf("subjail %d: timed out while waiting for hello message, bailing\n", gh_global_subjail_idx);
         return 1;
     }
     ghr_assert(res);
 
     if (msg->type != GH_IPCMSG_HELLO) {
-        fprintf(stderr, "subjail %d: received hello message\n", gh_global_subjail_idx);
+        gh_jail_printf("subjail %d: received hello message\n", gh_global_subjail_idx);
         return 1;
     }
 
-    fprintf(stderr, "subjail %d: received hello message\n", gh_global_subjail_idx);
+    gh_jail_printf("subjail %d: received hello message\n", gh_global_subjail_idx);
 
-    fprintf(stderr, "subjail %d: entering main message loop\n", gh_global_subjail_idx);
+    gh_jail_printf("subjail %d: entering main message loop\n", gh_global_subjail_idx);
 
     while (true) {
         ghr_assert(gh_ipc_recv(ipc, msg, 0));
@@ -585,14 +593,14 @@ int gh_subjail_main(gh_ipc * ipc, int parent_pid, gh_ipc * parent_ipc) {
 
     lua_close(L);
 
-    fprintf(stderr, "subjail %d: stopping gracefully\n", gh_global_subjail_idx);
+    gh_jail_printf("subjail %d: stopping gracefully\n", gh_global_subjail_idx);
     return 0;
 }
 
 gh_result gh_subjail_lockdown(void) {
     char * gh_sandbox = getenv("GH_SANDBOX_DISABLED");
     if (gh_sandbox != NULL && strcmp(gh_sandbox, "1") == 0) {
-        fprintf(stderr, "jail: SANDBOX DISABLED\n");
+        gh_jail_printf("jail: SANDBOX DISABLED\n");
         return GHR_OK;
     }
 

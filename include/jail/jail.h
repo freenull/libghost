@@ -3,6 +3,12 @@
 
 #include <ghost/sandbox.h>
 
+#ifdef GH_JAIL_DIAGNOSTICS
+#define gh_jail_printf(...) fprintf(stderr, __VA_ARGS__)
+#else
+#define gh_jail_printf(...)
+#endif
+
 #define GH_JAIL_HELLOTIMEOUTMS 1000 * 5
 
 /** @brief Global sandbox options.

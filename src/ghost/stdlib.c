@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#include <stdio.h>
 #include <pty.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -71,6 +72,69 @@ static void ghost_open(gh_rpc * rpc, gh_rpcframe * frame) {
 
     gh_rpcframe_returnfdhere(frame, fd);
 }
+
+gh_result gh_std_rename(gh_thread * thread, int from_dirfd, const char * from_path, int to_dirfd, const char * to_path) {
+    gh_result res = GHR_OK;
+    gh_result inner_res = GHR_OK;
+
+    gh_pathfd from_pathfd = {0};
+    res = gh_pathfd_opentrailing(from_dirfd, from_path, &from_pathfd);
+    if (ghr_iserr(res)) return res;
+
+    res = gh_perms_gatefile(&thread->perms, thread->safe_id, from_pathfd, GH_PERMFS_MOVE, NULL);
+    if (ghr_iserr(res)) goto close_from_pathfd;
+
+    gh_pathfd to_pathfd = {0};
+    res = gh_pathfd_opentrailing(to_dirfd, to_path, &to_pathfd);
+    if (ghr_iserr(res)) return res;
+
+    res = gh_perms_gatefile(&thread->perms, thread->safe_id, to_pathfd, GH_PERMFS_CREATEFILE, NULL);
+    if (ghr_iserr(res)) goto close_to_pathfd;
+
+    int rename_res = renameat2(from_pathfd.fd, from_pathfd.trailing_name, to_pathfd.fd, to_pathfd.trailing_name, RENAME_NOREPLACE);
+    if (rename_res < 0) {
+        res = ghr_errno(GHR_STD_RENAME);
+        goto close_to_pathfd;
+    }
+
+close_to_pathfd:
+    inner_res = gh_pathfd_close(to_pathfd);
+    if (ghr_iserr(inner_res)) res = inner_res;
+
+close_from_pathfd:
+    inner_res = gh_pathfd_close(from_pathfd);
+    if (ghr_iserr(inner_res)) res = inner_res;
+
+    return res;
+}
+
+static void ghost_rename(gh_rpc * rpc, gh_rpcframe * frame) {
+    (void)rpc;
+
+    char * from_buf;
+    size_t from_size;
+    if (!gh_rpcframe_argbuf(frame, 0, &from_buf, &from_size)) {
+        gh_rpcframe_failhere(frame, ghr_errnoval(GHR_RPCF_ARG0, EINVAL));
+    }
+
+    if (from_size > INT_MAX) gh_rpcframe_failhere(frame, ghr_errnoval(GHR_RPCF_ARG0, EFBIG));
+    from_buf[from_size - 1] = '\0';
+
+    char * to_buf;
+    size_t to_size;
+    if (!gh_rpcframe_argbuf(frame, 1, &to_buf, &to_size)) {
+        gh_rpcframe_failhere(frame, ghr_errnoval(GHR_RPCF_ARG0, EINVAL));
+    }
+
+    if (to_size > INT_MAX) gh_rpcframe_failhere(frame, ghr_errnoval(GHR_RPCF_ARG1, EFBIG));
+    to_buf[to_size - 1] = '\0';
+
+    gh_result res = gh_std_rename(frame->thread, AT_FDCWD, from_buf, AT_FDCWD, to_buf);
+    if (ghr_iserr(res)) {
+        gh_rpcframe_failhere(frame, res);
+    }
+}
+
 
 gh_result gh_std_unlinkat(gh_thread * thread, int dirfd, const char * path) {
     gh_result res = GHR_OK;
@@ -297,7 +361,7 @@ static void ghost_fshas(gh_rpc * rpc, gh_rpcframe * frame) {
     gh_rpcframe_returntypedhere(frame, &has_perms);
 }
 
-gh_result gh_std_execute(gh_thread * thread, int dirfd, const char * shellscript, char * const * envp, int * out_exitcode, int * out_ptyfd) {
+gh_result gh_std_execute(gh_thread * thread, int dirfd, const char * shellscript, char * const * envp, int * out_status, int * out_ptyfd) {
     gh_result res = GHR_OK;
     gh_result inner_res = GHR_OK;
 
@@ -356,19 +420,10 @@ gh_result gh_std_execute(gh_thread * thread, int dirfd, const char * shellscript
         goto close_pathfd;
     }
 
-    if (out_exitcode != NULL) {
-        int status = 0;
-        if (waitpid(pid, &status, 0) < 0) {
+    if (out_status != NULL) {
+        if (waitpid(pid, out_status, 0) < 0) {
             res = ghr_errno(GHR_STD_SPAWNWAIT);
             goto close_pathfd;
-        }
-
-        if (WIFEXITED(status)) {
-            *out_exitcode = WEXITSTATUS(status);
-        } else if (WIFSIGNALED(status)) {
-            *out_exitcode = 128 + WTERMSIG(status);
-        } else {
-            *out_exitcode = 255;
         }
     }
 
@@ -394,13 +449,13 @@ static void ghost_execute(gh_rpc * rpc, gh_rpcframe * frame) {
         cmd_buf[cmd_size] = '\0';
     }
 
-    int exitcode = 255;
-    gh_result res = gh_std_execute(frame->thread, AT_FDCWD, cmd_buf, environ, NULL, NULL);
+    int status = -1;
+    gh_result res = gh_std_execute(frame->thread, AT_FDCWD, cmd_buf, environ, &status, NULL);
     if (ghr_iserr(res)) {
         gh_rpcframe_failhere(frame, res);
     }
 
-    gh_rpcframe_returntypedhere(frame, &exitcode);
+    gh_rpcframe_returntypedhere(frame, &status);
 }
 
 static void ghost_popen(gh_rpc * rpc, gh_rpcframe * frame) {
@@ -424,7 +479,6 @@ static void ghost_popen(gh_rpc * rpc, gh_rpcframe * frame) {
         gh_rpcframe_failhere(frame, res);
     }
 
-    printf("RETURNING FD: %d\n", ptyfd);
     gh_rpcframe_returnfdhere(frame, ptyfd);
 }
 
@@ -432,6 +486,9 @@ gh_result gh_std_registerinrpc(gh_rpc * rpc) {
     gh_result res;
 
     res = gh_rpc_register(rpc, "ghost.open", ghost_open, GH_RPCFUNCTION_THREADSAFE);
+    if (ghr_iserr(res)) return res;
+
+    res = gh_rpc_register(rpc, "ghost.rename", ghost_rename, GH_RPCFUNCTION_THREADSAFE);
     if (ghr_iserr(res)) return res;
 
     res = gh_rpc_register(rpc, "ghost.opentemp", ghost_opentemp, GH_RPCFUNCTION_THREADSAFE);

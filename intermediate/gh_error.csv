@@ -171,6 +171,7 @@ RPCF_ARG13,,Invalid argument #13
 RPCF_ARG14,,Invalid argument #14
 RPCF_ARG15,,Invalid argument #15
 RPCF_ARG16,,Invalid argument #16
+RPCF_GENERIC,,Error in remote procedure
 
 TEST_GENERIC,,Generic error from test case
 
@@ -257,6 +258,7 @@ STD_SPAWNPTYCLOSE,,Failed closing pseudoterminal of new external command process
 STD_SPAWNPIPE,,Failed creating pipes for new external command process
 STD_SPAWNWAIT,,Failed waiting for external command process to terminate
 STD_SPAWNPIPECLOSE,,Failed closing pipe of new external command process
+STD_RENAME,,Failed renaming file
 
 SHA256_FAILED,,Failed calculating SHA256 hash
 

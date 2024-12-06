@@ -1,0 +1,6 @@
+macro("bc", function(param)
+    local f = io.popen("echo '" .. param .. "' | bc -l")
+    local result = trim(f:read("*a"))
+    write(result)
+    f:close()
+end)

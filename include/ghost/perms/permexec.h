@@ -50,6 +50,7 @@ typedef struct {
 #define GH_PERMEXEC_MAXARGS 2048
 #define GH_PERMEXEC_MAXALLOWEDENV 32
 typedef struct {
+    gh_permexec_mode default_mode;
     gh_permexec_hashlist hashlist;
     const char * allowed_env[GH_PERMEXEC_MAXALLOWEDENV];
 } gh_permexec;

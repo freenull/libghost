@@ -36,12 +36,12 @@ static bool message_recv(gh_ipc * ipc, gh_ipcmsg * msg) {
     case GH_IPCMSG_HELLO: ghr_fail(GHR_JAIL_MULTIHELLO); break;
 
     case GH_IPCMSG_QUIT:
-        fprintf(stderr, "jail: received request to exit\n");
+        gh_jail_printf("jail: received request to exit\n");
         return true;
 
     case GH_IPCMSG_SUBJAILALIVE: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
     case GH_IPCMSG_NEWSUBJAIL:
-        fprintf(stderr, "jail: creating new subjail\n");
+        gh_jail_printf("jail: creating new subjail\n");
         int sockfd = ((gh_ipcmsg_newsubjail *)msg)->sockfd;
         gh_subjail_spawn(sockfd, getpid(), ipc);
         if (close(sockfd) < 0) ghr_fail(GHR_JAIL_CLOSEFDFAIL);
@@ -58,7 +58,7 @@ static bool message_recv(gh_ipc * ipc, gh_ipcmsg * msg) {
     case GH_IPCMSG_FUNCTIONRETURN: ghr_fail(GHR_JAIL_UNSUPPORTEDMSG);
 
     default:
-        fprintf(stderr, "jail: received unknown message of type %d\n", (int)msg->type);
+        gh_jail_printf("jail: received unknown message of type %d\n", (int)msg->type);
         ghr_fail(GHR_JAIL_UNKNOWNMESSAGE);
         break;
     }
@@ -78,8 +78,8 @@ int main(int argc, char ** argv) {
         ghr_fail(GHR_JAIL_SIGCHLD);
     }
 
-    fprintf(stderr, "jail: started with pid %d\n", getpid());
-    fprintf(stderr, "jail: sandbox options fd is %s\n", argv[1]);
+    gh_jail_printf("jail: started with pid %d\n", getpid());
+    gh_jail_printf("jail: sandbox options fd is %s\n", argv[1]);
 
     intmax_t strtoimax_res = strtoimax(argv[1], NULL, 10);
     if ((strtoimax_res == INTMAX_MAX && errno == ERANGE) || strtoimax_res < 0 || strtoimax_res > INT_MAX) {
@@ -91,41 +91,41 @@ int main(int argc, char ** argv) {
     gh_result res = gh_sandboxoptions_readfrom(sandbox_options_fd, &gh_global_sandboxoptions);
     ghr_assert(res);
 
-    fprintf(stderr, "jail: sandbox options loaded\n");
-    fprintf(stderr, "jail: responsible for sandbox '%s'\n", gh_global_sandboxoptions.name);
-    fprintf(stderr, "jail: ipc socket fd is %d\n", gh_global_sandboxoptions.jail_ipc_sockfd);
+    gh_jail_printf("jail: sandbox options loaded\n");
+    gh_jail_printf("jail: responsible for sandbox '%s'\n", gh_global_sandboxoptions.name);
+    gh_jail_printf("jail: ipc socket fd is %d\n", gh_global_sandboxoptions.jail_ipc_sockfd);
 
 
     gh_ipc ipc;
     ghr_assert(gh_ipc_ctorconnect(&ipc, gh_global_sandboxoptions.jail_ipc_sockfd));
-    fprintf(stderr, "jail: connected to ipc\n");
+    gh_jail_printf("jail: connected to ipc\n");
 
-    fprintf(stderr, "jail: locking down\n");
+    gh_jail_printf("jail: locking down\n");
 
     ghr_assert(gh_jail_lockdown(&gh_global_sandboxoptions));
 
-    fprintf(stderr, "jail: security policy in effect\n");
+    gh_jail_printf("jail: security policy in effect\n");
 
-    fprintf(stderr, "jail: waiting for hello\n");
+    gh_jail_printf("jail: waiting for hello\n");
 
     char msg_buf[GH_IPCMSG_MAXSIZE];
     gh_ipcmsg * msg = (gh_ipcmsg *)msg_buf;
     res = gh_ipc_recv(&ipc, msg, GH_JAIL_HELLOTIMEOUTMS);
 
     if (res == GHR_IPC_RECVMSGTIMEOUT) {
-        fprintf(stderr, "jail: timed out while waiting for hello message, bailing\n");
+        gh_jail_printf("jail: timed out while waiting for hello message, bailing\n");
         return 1;
     }
     ghr_assert(res);
 
     if (msg->type != GH_IPCMSG_HELLO) {
-        fprintf(stderr, "jail: received non-hello message, bailing\n");
+        gh_jail_printf("jail: received non-hello message, bailing\n");
         return 1;
     }
 
-    fprintf(stderr, "jail: hello received from pid %d\n", ((gh_ipcmsg_hello*)msg)->pid);
+    gh_jail_printf("jail: hello received from pid %d\n", ((gh_ipcmsg_hello*)msg)->pid);
 
-    fprintf(stderr, "jail: entering main message loop\n");
+    gh_jail_printf("jail: entering main message loop\n");
 
     while (true) {
         ghr_assert(gh_ipc_recv(&ipc, msg, 0));
@@ -133,7 +133,7 @@ int main(int argc, char ** argv) {
         if (message_recv(&ipc, msg)) break;
     }
 
-    fprintf(stderr, "jail: stopping gracefully\n");
+    gh_jail_printf("jail: stopping gracefully\n");
 
     return 0;
 }
@@ -141,7 +141,7 @@ int main(int argc, char ** argv) {
 gh_result gh_jail_lockdown(gh_sandboxoptions * options) {
     char * gh_sandbox = getenv("GH_SANDBOX_DISABLED");
     if (gh_sandbox != NULL && strcmp(gh_sandbox, "1") == 0) {
-        fprintf(stderr, "jail: SANDBOX DISABLED\n");
+        gh_jail_printf("jail: SANDBOX DISABLED\n");
         return GHR_OK;
     }
 
@@ -172,6 +172,9 @@ gh_result gh_jail_lockdown(gh_sandboxoptions * options) {
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, TCGETS, 0, 1),
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW),
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_KILL_PROCESS),
+
+        // clock_gettime is likely to be in vDSO anyway
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_clock_gettime, 32, 0),
 
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_mremap, 31, 0),
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_ftruncate, 30, 0),

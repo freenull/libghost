@@ -171,3 +171,9 @@ function ghost.call(name, ret_type, ...)
 end
 
 ghost._udptr = c_support.udptr
+
+__ghost_callbacks = {}
+__ghost_host = {}
+
+ghost.callbacks = __ghost_callbacks
+ghost.hostvars = __ghost_host

@@ -62,7 +62,6 @@ int main(void) {
     assert(script >= 0);
     gh_threadnotif_script script_result;
     ghr_assert(gh_thread_runfilesync(&thread, script, &script_result));
-    fprintf(stderr, "AFTER RUN FILE SYNC\n");
     assert(close(script) >= 0);
 
     fprintf(stderr, "Script result: ");
@@ -75,7 +74,7 @@ int main(void) {
     ghr_assert(gh_thread_callframe_ctor(&frame));
     ghr_assert(gh_thread_callframe_string(&frame, "Hello, world!"));
 
-    ghr_assert(gh_thread_call(&thread, "luaprint", &frame));
+    ghr_assert(gh_thread_call(&thread, "luaprint", &frame, NULL));
 
     const char * s;
     assert(gh_thread_callframe_getstring(&frame, &s) == true);

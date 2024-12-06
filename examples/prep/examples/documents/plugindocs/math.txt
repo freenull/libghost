@@ -1,0 +1,5 @@
+# math.lua
+
+Allows doing some math.
+
+    #bc(expression) evaluates 'expression' with the bc program

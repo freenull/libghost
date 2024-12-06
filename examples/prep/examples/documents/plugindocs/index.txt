@@ -1,0 +1,32 @@
+== PLUGIN DOCS ==
+Self-hosted documentation of example prep plugins :)
+
+#embed(math.txt)
+
+-----------------
+
+#embed(embed.txt)
+
+-----------------
+
+#embed(table.txt)
+
+-----------------
+
+#embed(web.txt)
+
+-----------------
+
+Example table below!
+
+#table(3 #
+    Name # Age # Height # 
+    John # 25 # 160cm #
+    Lucy # 30 # 172cm #
+    Really Long Name # 40 # 1000cm
+)
+
+10+10 = #bc(10 + 10)
+sqrt(42) = #bc(sqrt(42))
+
+Your IP address: #curl(ifconfig.me)

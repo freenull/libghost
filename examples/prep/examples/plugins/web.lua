@@ -1,0 +1,5 @@
+macro("curl", function(url)
+    local f = io.popen("curl '" .. url:gsub("\\", "\\\\"):gsub("'", "\\'") .. "'")
+    write(trim(f:read("*a")))
+    f:close()
+end)

@@ -36,7 +36,10 @@ struct gh_permprompter {
 
 gh_permprompter gh_permprompter_new(gh_permprompter_func * func, void * userdata);
 gh_result gh_permprompter_request(gh_permprompter * prompter, const gh_permrequest * req, gh_permresponse * out_response);
+
+#define GH_PERMPROMPTER_STDERRFLAG (((uintptr_t)1 << ((sizeof(uintptr_t) * 8) - 1))) 
 gh_permprompter gh_permprompter_simpletui(int fd);
+gh_permprompter gh_permprompter_simpletui_stderr(int in_fd);
 
 #ifdef __cplusplus
 }

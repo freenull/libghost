@@ -1,0 +1,5 @@
+macro("embed", function (path)
+    local f = io.open(path, "r")
+    write(trim(f:read("*a")))
+    f:close()
+end)

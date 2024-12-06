@@ -1,19 +1,22 @@
 local ghost = require("ghost")
 
-local f = io.popen("yes")
-print("GOT YES FILE:", f)
-print("yes out: ", f:read(3))
-print("one yes line: ", f:read("*l"))
-print("one yes line: ", f:read("*l"))
-print("one yes line: ", f:read("*l"))
-f:close()
-print("YES FILE:", f)
+local ok, err = pcall(function()
+    local f = io.popen("yes")
+    assert(f ~= nil)
+    assert(f:read(2) == "y\n")
+    assert(f:read("*l") == "y\n")
+    assert(f:read("*l") == "y\n")
+    f:close()
 
-print("os.execute =", os.execute)
+    assert(os.execute("true") == 0)
+    assert(os.execute("false") == 1)
+    assert(os.execute("exit 42") == 42)
+    assert(os.execute("NON-EXISTING-FOO") == 32512)
+end)
 
-print(os.execute("adfsdf"))
-local result = os.execute("echo one")
-print("os.execute result:", result)
+if not ok and not string.find(err, "PERMS_REJECTEDPOLICY") then
+    error(err)
+end
 
 local f = io.open("/tmp/dane.txt", "w+")
 print("F", f)

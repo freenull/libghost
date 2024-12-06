@@ -14,3 +14,4 @@ ACCESS_OTHER_EXECUTE,access.o+x,::,Configure created files and directories to be
 READ,read,::,Read the contents of the file
 WRITE,write,::,Write to the file
 UNLINK,unlink,::,Remove the file or empty directory
+MOVE,move,::,Move the file to another location (this requires permission to create a file at that location)

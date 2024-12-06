@@ -69,6 +69,21 @@ ffi.cdef[[
 
     typedef int gh_permfs_mode;
     gh_permfs_mode gh_permfs_mode_fromident(const char * ident);
+
+    // TODO: ONLY TRUE ON 64 BITS!
+    typedef long time_t;
+
+    // TODO: Order is not guaranteed by standard!
+    // TODO: C23 allows tv_nsec to be of an implementation defined type!
+    struct timespec {
+        time_t tv_sec;
+        long tv_nsec;
+    };
+    typedef int clockid_t;
+    static const clockid_t CLOCK_REALTIME = 0;
+    static const clockid_t CLOCK_MONOTONIC = 1;
+    static const clockid_t CLOCK_PROCESS_CPUTIME_ID = 2;
+    int clock_gettime(clockid_t clk_id, struct timespec *tp);
 ]]
 
 local MAP_FAILED = ffi.cast("void*", -1)
@@ -490,14 +505,21 @@ ghost_io.write = function(...)
 end
 
 local function unimplemented()
-    error("unimplemented")
+    error("The function you have tried to call is not implemented in the libghost standard library.")
 end
 
 local lua_os = require("os")
 
-ghost_os.clock = unimplemented
+ghost_os.clock = function()
+    local timespec = ffi.new("struct timespec[1]")
+    ffi.C.clock_gettime(ffi.C.CLOCK_PROCESS_CPUTIME_ID, timespec)
+    return timespec[0].tv_sec + timespec[0].tv_nsec / 1000 / 1000 / 1000
+end
+
 ghost_os.date = unimplemented
-ghost_os.difftime = unimplemented
+ghost_os.difftime = function(t2, t1)
+    return t2 - t1
+end
 ghost_os.execute = function(cmd)
     return ghost.call("ghost.execute", "int", cmd)
 end
@@ -517,15 +539,26 @@ ghost_os.remove = function(path)
     return true
 end
 
-ghost_os.rename = unimplemented
-ghost_os.setlocale = os.setlocale
-ghost_os.time = unimplemented
+ghost_os.rename = function(from, to)
+    return ghost.call("ghost.rename", nil, from, to)
+end
+ghost_os.setlocale = unimplemented
+
+ghost_os.time = function(tab)
+    if tab == nil then
+        local timespec = ffi.new("struct timespec[1]")
+        ffi.C.clock_gettime(ffi.C.CLOCK_REALTIME, timespec)
+        return timespec[0].tv_sec
+    end
+
+    unimplemented()
+end
 
 ghost_os.tmpname = function(prefix)
     prefix = tostring(prefix)
 
     local ok, path, fd = pcall(function()
-        return ghost.call("ghost.opentemp", "string", prefix or "", ffi.new("int", ffi.C.O_CREAT))
+        return ghost.call("ghost.opentemp", "string", 4096, prefix or "", ffi.new("int", ffi.C.O_CREAT))
     end)
 
     if not ok then

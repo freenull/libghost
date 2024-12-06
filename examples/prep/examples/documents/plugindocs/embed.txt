@@ -1,0 +1,7 @@
+# embed.lua
+
+Allows embedding a text file.
+You can use:
+    #embed(path) to include a file and trim any whitespace at the start/end
+
+NOTE! This doesn't expand macros inside embedded files.
