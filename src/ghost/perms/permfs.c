@@ -100,11 +100,18 @@ static gh_result permfs_appendentry(gh_permfs * permfs, gh_permfs_ident ident, g
 
     gh_result res = gh_alloc_new(permfs->file_perms.alloc, (void**)(void*)&file_perm.ident.path.ptr, (ident.path.len + 1) * sizeof(char));
     if (ghr_iserr(res)) return res;
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdiscarded-qualifiers"
+#endif
 #pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wincompatible-pointer-types-discards-qualifiers"
+#pragma clang diagnostic ignored "-Wcast-qual"
     // RATIONALE: This constructs the path. The memory for it was just allocated.
-    strncpy(file_perm.ident.path.ptr, ident.path.ptr, ident.path.len + 1);
+    strncpy((char*)file_perm.ident.path.ptr, ident.path.ptr, ident.path.len + 1);
 #pragma clang diagnostic pop
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
     file_perm.ident.path.len = ident.path.len;
 
     res = gh_permfs_entrylist_append(&permfs->file_perms, file_perm);

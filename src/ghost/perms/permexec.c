@@ -279,7 +279,7 @@ gh_result gh_permexec_gate(gh_permexec * permexec, gh_permprompter * prompter, g
     if (ghr_iserr(res)) return res;
 
     gh_permexec_reqdata reqdata = {0};
-    res = permexec_makerequest(safe_id, exe_path, argc, argv, envc, envp, &reqdata);
+    res = permexec_makerequest(safe_id, exe_path, argc, argv, envc, new_envp, &reqdata);
     if (ghr_iserr(res)) goto dtor_exe_path;
 
     gh_permresponse resp;

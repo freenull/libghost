@@ -17,6 +17,12 @@ Currently, only Linux is supported.
 
 ## Building
 
+Make sure that submodules are up to date:
+
+```sh
+git submodule update --init --recursive
+```
+
 Create build directory and prepare build with cmake:
 
 ```sh

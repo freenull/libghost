@@ -373,18 +373,18 @@ gh_result gh_std_execute(gh_thread * thread, int dirfd, const char * shellscript
     res = gh_pathfd_open(dirfd, shell_program, &pathfd, GH_PATHFD_RESOLVELINKS);
     if (ghr_iserr(res)) return res;
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
     char * const argv[] = {
         shell_program,
         "-c",
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-qual"
         // RATIONALE: The odd interface of (char * const *) for argv and envp is
         // caused by the signature of execve. The strings don't have to be mutable.
 
         (char *)shellscript,
-#pragma GCC diagnostic pop
         NULL
     };
+#pragma GCC diagnostic pop
 
     res = gh_perms_gateexec(&thread->perms, thread->safe_id, pathfd, argv, envp);
     if (ghr_iserr(res)) goto close_pathfd;
