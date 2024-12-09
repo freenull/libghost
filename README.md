@@ -23,13 +23,13 @@ Make sure that submodules are up to date:
 git submodule update --init --recursive
 ```
 
-Create build directory and prepare build with cmake:
+Create build directory and prepare build with cmake (`-DEXAMPLES=ON` enables building example programs):
 
 ```sh
-cmake -B build
+cmake -B build -DEXAMPLES=ON
 ```
 
-Build the library:
+Build the library and examples:
 
 ```sh
 cmake --build build
@@ -57,6 +57,8 @@ There are 4 steps to the build:
 * `libghost.so` is rebuilt with `ghost-jail` embedded.
 
 The final `libghost.so` is self-contained and does not need `ghost-jail` to be on disk.
+
+The directory `build/examples` contains the example programs [`filesize`](examples/filesize/README.md) and [`prep`](examples/prep/README.md).
 
 ## Documentation
 

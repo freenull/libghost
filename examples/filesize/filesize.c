@@ -23,15 +23,18 @@ typedef struct {
 static gh_result ext_prompter(const gh_permrequest * req, void * userdata, gh_permresponse * out_response) {
     extprompter_loc * loc = (extprompter_loc *)userdata;
 
-    char * argv[] = {
 #pragma GCC diagnostic push
+#ifdef __clang__
 #pragma GCC diagnostic ignored "-Wincompatible-pointer-types-discards-qualifiers"
+#else
+#pragma GCC diagnostic ignored "-Wdiscarded-qualifiers"
+#endif
+    char * argv[] = {
         loc->path,
 
         req->source,
         req->group,
         req->resource,
-#pragma GCC diagnostic pop
 
         NULL,
         NULL,
@@ -52,6 +55,7 @@ static gh_result ext_prompter(const gh_permrequest * req, void * userdata, gh_pe
 
         NULL,
     };
+#pragma GCC diagnostic pop
 
     for (size_t i = 0; i < GH_PERMREQUEST_MAXFIELDS; i++) {
         const gh_permrequest_field * field = req->fields + i;
