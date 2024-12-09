@@ -2,7 +2,7 @@
 
 Secure Lua execution environment based on LuaJIT with process isolation.
 
-Result of engineering thesis at the Wrocław University of Science and Technology [link todo].
+Result of engineering thesis at the Wrocław University of Science and Technology [TODO :link].
 
 ## Supported platforms
 
@@ -52,8 +52,12 @@ There are 4 steps to the build:
 
 The final `libghost.so` is self-contained and does not need `ghost-jail` to be on disk.
 
-## Design
+## Documentation
 
-The API is designed around objects called "sandboxes". A sandbox is a process running `ghost-jail` and a full LuaJIT JIT compiler with a socket for IPC.
+Build documentation by running the following command in the root directory:
 
-TODO
+```sh
+doxygen
+```
+
+Documentation is written into the `docs` directory.

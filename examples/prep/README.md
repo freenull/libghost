@@ -48,3 +48,5 @@ Use `make -B` if you want to generate the output document again (for example, to
 This program is a proper demonstration of implementing safe, sandboxed extensions without limiting the range of possibilities.
 
 Example plugins inside `examples/plugins/` do things such as run external commands and access files. When generating the output document, the application will ask you for permission for each file or command. You can answer 'Y' to remember the permissions in a special `.ghperm` file that is placed next to the plugin. The next time you run the program, the permissions are loaded back in.
+
+All code that touches `libghost` resides in `plugin.c`.
