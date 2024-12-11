@@ -25,6 +25,9 @@ jobs:
     - name: Install Valgrind
       run: sudo apt install -y valgrind
 
+    - name: Install OpenSSL development package
+      run: sudo apt install -y libssl-dev
+
     - name: Retrieve submodules
       run: git submodule update --init --recursive
 
