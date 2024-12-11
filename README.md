@@ -6,7 +6,7 @@ Result of engineering thesis at the Wrocław University of Science and Technolog
 
 ## Supported platforms
 
-Currently, only Linux is supported.
+Only Linux is currently supported.
 
 ## Requirements
 
@@ -15,6 +15,7 @@ Currently, only Linux is supported.
 * Python3.11+ (for build-time tools)
 * C compiler toolchain
 * Valgrind (for running tests)
+* Headers for OpenSSL (you may need to install a package like `libssl-dev`)
 
 ## Building
 

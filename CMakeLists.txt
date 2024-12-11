@@ -142,7 +142,7 @@ add_library(libluajit STATIC IMPORTED)
 add_dependencies(libluajit luajit)
 set_target_properties(libluajit PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/libs/luajit/src/libluajit.a")
 
-set(SHA256_PROVIDER_LIB "ssl" CACHE INTERNAL "Library needed to link the SHA256 provider.")
+set(SHA256_PROVIDER_LIB "ssl;crypto" CACHE INTERNAL "Library needed to link the SHA256 provider.")
 set(SHA256_PROVIDER_INC "" CACHE INTERNAL "Compiler include paths needed to link the SHA256 provider.")
 set(SHA256_PROVIDER_IMPL "${CMAKE_SOURCE_DIR}/src/sha256provider_openssl.c" CACHE STRING "Source file implementing the SHA256 provider interface.")
 
