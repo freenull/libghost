@@ -307,7 +307,6 @@ static gh_result lua_callfunction(gh_ipc * ipc, gh_ipcmsg_luacall * msg) {
     if (ghr_iserr(res)) return res;
 
     gh_fdmem mem;
-    puts("FDMEM CTOR");
     res = gh_fdmem_ctorfdo(&mem, msg->ipcfdmem_fd, msg->ipcfdmem_occupied);
     if (ghr_iserr(res)) return res;
     
@@ -368,7 +367,6 @@ respond:
     lua_settop(L, prev_top);
 
     ipcfdmem_dtor_res = gh_fdmem_dtor(&mem);
-    ghr_fputs(stdout, ipcfdmem_dtor_res);
 
     inner_res = gh_ipc_send(ipc, (gh_ipcmsg *)&result_msg, sizeof(gh_ipcmsg_luaresult));
     if (ghr_iserr(inner_res)) return inner_res;
