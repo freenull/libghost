@@ -14,7 +14,7 @@ Only Linux is currently supported.
 * CMake 3.27+
 * Python3.11+ (for build-time tools)
 * C compiler toolchain
-* Valgrind (for running tests)
+* Valgrind (for running tests, at least 3.23.0 or some tests may fail)
 * Headers for OpenSSL (you may need to install a package like `libssl-dev`)
 
 ## Building
