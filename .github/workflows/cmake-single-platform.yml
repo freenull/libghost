@@ -22,31 +22,8 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install debug symbols for ld.so
-      run: sudo apt install libc6-dbg
-
-    - name: Retrieve Valgrind
-      run: git clone https://sourceware.org/git/valgrind.git ${{github.workspace}}/valgrind
-
-    - name: Apply patch for execveat fix
-      working-directory: ${{github.workspace}}/valgrind
-      run: env GIT_COMMITTER_NAME=ci GIT_COMMITTER_EMAIL=ci@example.org git am < ${{github.workspace}}/tools/valgrind-execveat-fix.mbox
-
-    - name: Build Valgrind (autogen)
-      working-directory: ${{github.workspace}}/valgrind
-      run: ./autogen.sh
-
-    - name: Build Valgrind (configure)
-      working-directory: ${{github.workspace}}/valgrind
-      run: ./configure --prefix=/usr
-
-    - name: Build Valgrind (make)
-      working-directory: ${{github.workspace}}/valgrind
-      run: make
-
-    - name: Build Valgrind (install)
-      working-directory: ${{github.workspace}}/valgrind
-      run: sudo make install
+    - name: Install Valgrind
+      run: sudo apt install -y valgrind
 
     - name: Retrieve submodules
       run: git submodule update --init --recursive
@@ -64,5 +41,4 @@ jobs:
       working-directory: ${{github.workspace}}/build
       # Execute tests defined by the CMake configuration.
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
-      run: ctest -C ${{env.BUILD_TYPE}} --output-on-failure
-
+      run: ctest -C ${{env.BUILD_TYPE}}

@@ -175,8 +175,7 @@ struct gh_permparser {
  * @param buffer Pointer to the start of the buffer.
  * @param size Size of the buffer.
  *
- * @return @ref GHR_OK on success, or @n
- *         The set of possible results of @ref gh_bytebuffer_ctor.
+ * @return @ref GHR_OK on success or a result code indicating an error.
  */
 gh_result gh_permparser_ctorbuffer(gh_permparser * parser, gh_alloc * alloc, const char * buffer, size_t size);
 
@@ -187,10 +186,7 @@ gh_result gh_permparser_ctorbuffer(gh_permparser * parser, gh_alloc * alloc, con
  * @param alloc Instance of an allocator.
  * @param fd File descriptor.
  *
- * @return @ref GHR_OK on success, or @n
- *         @ref GHR_PERMPARSER_FAILEDSEEK, or @n
- *         @ref GHR_PERMPARSER_FAILEDMMAP, or @n
- *         The set of possible results of @ref gh_bytebuffer_ctor.
+ * @return @ref GHR_OK on success or a result code indicating an error.
  */
 gh_result gh_permparser_ctorfd(gh_permparser * parser, gh_alloc * alloc, int fd);
 
@@ -198,9 +194,7 @@ gh_result gh_permparser_ctorfd(gh_permparser * parser, gh_alloc * alloc, int fd)
  *
  * @param parser Parser instance.
  *
- * @return @ref GHR_OK on success, or @n
- *         @ref GHR_PERMPARSER_FAILEDMUNMAP, or @n
- *         The set of possible results of @ref gh_bytebuffer_dtor.
+ * @return @ref GHR_OK on success or a result code indicating an error.
  */
 gh_result gh_permparser_dtor(gh_permparser * parser);
 
@@ -209,10 +203,7 @@ gh_result gh_permparser_dtor(gh_permparser * parser);
  * @param parser Parser instance.
  * @param[out] out_token Will hold the newly read token.
  *
- * @return @ref GHR_OK on success, or @n
- *         @ref GHR_PERMPARSER_UNTERMINATEDSTRING, or @n
- *         @ref GHR_PERMPARSER_UNEXPECTEDTOKEN, or @n
- *         The set of possible results of @ref gh_bytebuffer_append.
+ * @return @ref GHR_OK on success or a result code indicating an error.
  */
 gh_result gh_permparser_nexttoken(gh_permparser * parser, gh_permtoken * out_token);
 
@@ -224,10 +215,7 @@ gh_result gh_permparser_nexttoken(gh_permparser * parser, gh_permtoken * out_tok
  * @param parser Parser instance.
  * @param[out] out_token Will hold the peeked token.
  *
- * @return @ref GHR_OK on success, or @n
- *         @ref GHR_PERMPARSER_UNTERMINATEDSTRING, or @n
- *         @ref GHR_PERMPARSER_UNEXPECTEDTOKEN, or @n
- *         The set of possible results of @ref gh_bytebuffer_append.
+ * @return @ref GHR_OK on success or a result code indicating an error.
  */
 gh_result gh_permparser_peektoken(gh_permparser * parser, gh_permtoken * out_token);
 
@@ -248,27 +236,7 @@ gh_result gh_permparser_registerresource(gh_permparser * parser, gh_permresource
  *
  * @param parser Parser instance.
  *
- * @return @ref GHR_OK on success, or @n
- *         @ref GHR_PERMPARSER_UNTERMINATEDSTRING, or @n
- *         @ref GHR_PERMPARSER_UNEXPECTEDTOKEN, or @n
- *         @ref GHR_PERMPARSER_EXPECTEDGROUPID, or @n
- *         @ref GHR_PERMPARSER_LARGEGROUPID, or @n
- *         @ref GHR_PERMPARSER_EXPECTEDRESOURCEID, or @n
- *         @ref GHR_PERMPARSER_LARGERESOURCEID, or @n
- *         @ref GHR_PERMPARSER_EXPECTEDRESOURCEBEGIN, or @n
- *         @ref GHR_PERMPARSER_UNKNOWNRESOURCE, or @n
- *         @ref GHR_PERMPARSER_EXPECTEDENTRY, or @n
- *         @ref GHR_PERMPARSER_EXPECTEDENTRYBEGIN, or @n
- *         @ref GHR_PERMPARSER_EXPECTEDFIELD, or @n
- *         @ref GHR_PERMPARSER_LARGEFIELD, or @n
- *         @ref GHR_PERMPARSER_EXPECTEDENTRYEND, or @n
- *         @ref GHR_PERMPARSER_EXPECTEDRESOURCEEND, or @n
- *         The set of possible results of @ref gh_bytebuffer_append, or @n
- *         Any other result code returned by a user-provided @ref gh_permresourceparser callback, in particular: @n
- *         @ref GHR_PERMPARSER_EXPECTEDIDENTIFIER and @n
- *         @ref GHR_PERMPARSER_EXPECTEDSTRING
- *  
- *         @ref GHR_PERMPARSER_RESOURCEPARSERLIMIT
+ * @return @ref GHR_OK on success or a result code indicating an error.
  */
 gh_result gh_permparser_parse(gh_permparser * parser);
 
@@ -277,11 +245,7 @@ gh_result gh_permparser_parse(gh_permparser * parser);
  * @param parser Parser instance.
  * @param[out] out_str Will contain the contents of the identifier token if the function succeeds.
  *
- * @return @ref GHR_OK on success, or @n
- *         @ref GHR_PERMPARSER_EXPECTEDIDENTIFIER or @n
- *         @ref GHR_PERMPARSER_UNTERMINATEDSTRING, or @n
- *         @ref GHR_PERMPARSER_UNEXPECTEDTOKEN, or @n
- *         The set of possible results of @ref gh_bytebuffer_append.
+ * @return @ref GHR_OK on success or a result code indicating an error.
  *  
  */
 gh_result gh_permparser_nextidentifier(gh_permparser * parser, gh_conststr * out_str);
@@ -291,11 +255,7 @@ gh_result gh_permparser_nextidentifier(gh_permparser * parser, gh_conststr * out
  * @param parser Parser instance.
  * @param[out] out_str Will contain the contents of the string token if the function succeeds.
  *
- * @return @ref GHR_OK on success, or @n
- *         @ref GHR_PERMPARSER_EXPECTEDSTRING, or @n
- *         @ref GHR_PERMPARSER_UNTERMINATEDSTRING, or @n
- *         @ref GHR_PERMPARSER_UNEXPECTEDTOKEN, or @n
- *         The set of possible results of @ref gh_bytebuffer_append.
+ * @return @ref GHR_OK on success or a result code indicating an error.
  *  
  */
 gh_result gh_permparser_nextstring(gh_permparser * parser, gh_conststr * out_str);

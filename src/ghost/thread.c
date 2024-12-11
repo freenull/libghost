@@ -215,7 +215,7 @@ gh_result gh_thread_attachuserdata(gh_thread * thread, void * userdata) {
 }
 
 static gh_result thread_handlemsg_functioncall(gh_thread * thread, gh_ipcmsg_functioncall * msg) {
-    gh_rpc * rpc = gh_thread_rpc(thread);
+    gh_rpc * rpc = thread->rpc;
     gh_rpcframe frame;
     gh_result res = gh_rpc_newframefrommsg(rpc, thread, msg, &frame);
     if (ghr_is(res, GHR_RPC_MISSINGFUNC)) {
@@ -287,10 +287,6 @@ gh_result gh_thread_process(gh_thread * thread, gh_threadnotif * notif) {
     if (ghr_iserr(res)) return res;
 
     return thread_handlemsg(thread, msg, notif);
-}
-
-inline gh_rpc * gh_thread_rpc(gh_thread * thread) {
-    return thread->rpc;
 }
 
 gh_result gh_thread_runstring(gh_thread * thread, const char * s, size_t s_len, int * script_id) {
@@ -616,8 +612,7 @@ gh_result gh_thread_call(gh_thread * thread, const char * name, gh_thread_callfr
 
     memcpy(msg.params, frame->param_ptrs, sizeof(gh_fdmem_ptr) * GH_IPCMSG_LUACALL_MAXPARAMS);
 
-
-    strncpy(msg.name, name, name_len + 1);
+    strcpy(msg.name, name);
 
     msg.ipcfdmem_occupied = frame->fdmem.occupied;
 

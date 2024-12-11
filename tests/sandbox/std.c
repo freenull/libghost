@@ -63,7 +63,7 @@ int main(void) {
         assert(close(perms_file) >= 0);
     }
 
-    assert(write(pipefd[1], "y\ny\ny\ny\ny\ny\ny\ny\n", 18) == 18);
+    assert(write(pipefd[1], "y\ny\ny\ny\ny\ny\ny\ny\n", 16) == 16);
 
     int script = open("std.lua", O_RDONLY);
     assert(script >= 0);

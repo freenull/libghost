@@ -63,8 +63,7 @@ gh_result gh_embeddedjail_exec(const char * name, int options_fd) {
         envp[0] = "GH_SANDBOX_DISABLED=1";
     }
 
-    int exec_res = execve("/home/db/Projects/C/ghost/build/ghost-jail", (char * const *)argv, envp);
-    /* int exec_res = fexecve(fd, (char * const *)argv, envp); */
+    int exec_res = fexecve(fd, (char * const *)argv, envp);
 #pragma GCC diagnostic pop
     if (exec_res < 0) return ghr_errno(GHR_EMBEDDEDJAIL_EXECFAIL);
 

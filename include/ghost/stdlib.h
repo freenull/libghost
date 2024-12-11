@@ -34,6 +34,12 @@ gh_result gh_std_fsrequest(gh_thread * thread, int dirfd, const char * path, gh_
 
 gh_result gh_std_execute(gh_thread * thread, int dirfd, const char * shellscript, char * const * envp, int * out_exitcode, int * out_ptyfd);
 
+/** @brief Register Lua integration layer functions in RPC registrar.
+ *
+ * @param rpc RPC registrar instance.
+ *
+ * @return @ref GHR_OK on success or a result code indicating an error.
+ */
 gh_result gh_std_registerinrpc(gh_rpc * rpc);
 
 #ifdef __cplusplus

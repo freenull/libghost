@@ -17,7 +17,7 @@ function(GhostTest name)
         set(GHTEST_TIMEOUT 10)
     endif()
 
-    set(src ${name}.c)
+    set(src ${name}.c ${CMAKE_SOURCE_DIR}/tests/valgrind_workaround.c)
 
     add_executable(test-${__ghost_test_namespace}-${name} ${src})
     target_link_libraries(test-${__ghost_test_namespace}-${name} libghost)
