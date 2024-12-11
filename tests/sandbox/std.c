@@ -27,7 +27,10 @@ int main(void) {
 
     gh_alloc alloc = gh_alloc_default();
 
-    gh_permprompter prompter = gh_permprompter_simpletui(STDIN_FILENO);
+    int pipefd[2];
+    assert(pipe(pipefd) >= 0);
+
+    gh_permprompter prompter = gh_permprompter_simpletui(pipefd[0]);
 
     gh_rpc rpc;
     ghr_assert(gh_rpc_ctor(&rpc, &alloc));
@@ -43,6 +46,8 @@ int main(void) {
         .default_timeout_ms = GH_IPC_NOTIMEOUT
     }));
 
+    thread.perms.exec.default_mode = GH_PERMEXEC_PROMPT;
+
     int perms_file = open("std.ghperm", O_RDONLY);
     assert(perms_file >= 0 || errno == ENOENT);
 
@@ -57,6 +62,8 @@ int main(void) {
         }
         assert(close(perms_file) >= 0);
     }
+
+    assert(write(pipefd[1], "y\ny\ny\ny\ny\ny\ny\ny\n", 18) == 18);
 
     int script = open("std.lua", O_RDONLY);
     assert(script >= 0);
@@ -74,18 +81,18 @@ int main(void) {
     ghr_assert(gh_thread_callframe_ctor(&frame));
     ghr_assert(gh_thread_callframe_string(&frame, "Hello, world!"));
 
-    ghr_assert(gh_thread_call(&thread, "luaprint", &frame, NULL));
+    gh_threadnotif_script call_result;
+    ghr_assert(gh_thread_call(&thread, "luaprint", &frame, &call_result));
+    ghr_assert(call_result.result);
 
     const char * s;
+
     assert(gh_thread_callframe_getstring(&frame, &s) == true);
-    printf("RETURN: %s\n", s);
+    assert(strcmp(s, "Abc") == 0);
 
     ghr_assert(gh_thread_callframe_dtor(&frame));
 
-    fprintf(stderr, "Script result: ");
-    ghr_fputs(stderr, script_result.result);
-
-    fprintf(stderr, "Script error: %s\n", script_result.error_msg);
+    ghr_assert(script_result.result);
 
     perms_file = open("std.ghperm", O_WRONLY | O_TRUNC | O_CREAT, 0644);
     assert(perms_file >= 0);
@@ -104,5 +111,7 @@ int main(void) {
     ghr_fputs(stderr, sandbox_res);
 
     ghr_assert(gh_rpc_dtor(&rpc));
+    assert(close(pipefd[0]) >= 0);
+    assert(close(pipefd[1]) >= 0);
     return 0;
 }

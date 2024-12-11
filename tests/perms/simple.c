@@ -109,7 +109,7 @@ int main(void) {
     int in_fd = open("./simple.lua", O_RDONLY);
     assert(in_fd >= 0);
     gh_threadnotif_script script_result;
-    ghr_asserterr(GHR_THREAD_LUAFAIL, gh_thread_runfilesync(&thread, in_fd, &script_result));
+    ghr_assert(gh_thread_runfilesync(&thread, in_fd, &script_result));
 
     ghr_asserterr(GHR_LUA_RUNTIME, script_result.result);
     assert(strstr(script_result.error_msg, "[PERMS_REJECTEDPOLICY]") != NULL);

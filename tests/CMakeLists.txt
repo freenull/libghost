@@ -7,14 +7,14 @@ endfunction()
 function(GhostTest name)
     cmake_parse_arguments(
         GHTEST
-        "MAYLEAK;NOSANDBOX;INTERACTIVE"
+        "MAYLEAK;NOSANDBOX;INTERACTIVE;NOVALGRIND"
         "TIMEOUT;STDIN"
         ""
         ${ARGN}
     )
 
     if (NOT DEFINED GHTEST_TIMEOUT)
-        set(GHTEST_TIMEOUT 0)
+        set(GHTEST_TIMEOUT 10)
     endif()
 
     set(src ${name}.c)
@@ -36,7 +36,11 @@ function(GhostTest name)
         list(APPEND extra_valgrind_opts --leak-check=full --show-leak-kinds=all)
     endif()
 
-    add_test(NAME ${__ghost_test_namespace}/${name} COMMAND valgrind --trace-children=yes ${extra_valgrind_opts} --error-exitcode=1 env ${env} $<TARGET_FILE:test-${__ghost_test_namespace}-${name}> WORKING_DIRECTORY ${test_workdir})
+    if(GHTEST_NOVALGRIND)
+        add_test(NAME ${__ghost_test_namespace}/${name} COMMAND $<TARGET_FILE:test-${__ghost_test_namespace}-${name}> WORKING_DIRECTORY ${test_workdir})
+    else()
+        add_test(NAME ${__ghost_test_namespace}/${name} COMMAND valgrind --trace-children=yes ${extra_valgrind_opts} --error-exitcode=1 env ${env} $<TARGET_FILE:test-${__ghost_test_namespace}-${name}> WORKING_DIRECTORY ${test_workdir})
+    endif()
 
     set_tests_properties(${__ghost_test_namespace}/${name} PROPERTIES TIMEOUT ${GHTEST_TIMEOUT})
 endfunction()

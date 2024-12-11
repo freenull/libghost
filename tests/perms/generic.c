@@ -378,10 +378,15 @@ int main(void) {
     ghr_assert(gh_rpc_register(&rpc, "getsecretkey", rpc_getsecretkey, GH_RPCFUNCTION_THREADUNSAFEGLOBAL));
     ghr_assert(gh_rpc_register(&rpc, "setsecretkey", rpc_setsecretkey, GH_RPCFUNCTION_THREADUNSAFEGLOBAL));
 
+    int pipefd[2];
+    assert(pipe(pipefd) >= 0);
+
+    gh_permprompter prompter = gh_permprompter_simpletui(pipefd[0]);
+
     gh_threadoptions thread_options = {
         .sandbox = &sandbox,
         .rpc = &rpc,
-        .prompter = gh_permprompter_simpletui(STDIN_FILENO),
+        .prompter = prompter,
         .default_timeout_ms = GH_IPC_NOTIMEOUT,
         .name = "my thread",
         .safe_id = "lua program"
@@ -399,6 +404,7 @@ int main(void) {
         assert(close(savedfd) >= 0);
     }
 
+    assert(write(pipefd[1], "y\ny\n", 4) == 4);
     int luafd = open("generic.lua", O_RDONLY);
     assert(luafd >= 0);
 
@@ -420,5 +426,9 @@ int main(void) {
     assert(close(savedfd) >= 0);
 
     ghr_assert(gh_thread_dtor(&thread, NULL));
+    ghr_assert(gh_rpc_dtor(&rpc));
     ghr_assert(gh_sandbox_dtor(&sandbox, NULL));
+
+    assert(close(pipefd[1]) >= 0);
+    assert(close(pipefd[0]) >= 0);
 }

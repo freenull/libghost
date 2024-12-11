@@ -40,7 +40,7 @@ int main(void) {
 
     gh_perms * perms = &thread.perms;
 
-    int permfd = open("parser_input.ghperm", O_RDONLY);
+    int permfd = open("parser_input.txt", O_RDONLY);
     assert(permfd >= 0);
 
     gh_permparser_error error;
@@ -52,7 +52,7 @@ int main(void) {
 
     // TESTING PERMISSIONS ON /tmp
     gh_pathfd fd;
-    ghr_assert(gh_pathfd_open(AT_FDCWD, "/tmp", &fd, false));
+    ghr_assert(gh_pathfd_open(AT_FDCWD, "/tmp", &fd, GH_PATHFD_ALLOWMISSING));
 
     // both READ and CREATEDIR are 'self accept' in /tmp entry
     ghr_assert(gh_perms_gatefile(&thread.perms, thread.safe_id, fd, GH_PERMFS_CREATEDIR | GH_PERMFS_READ, NULL));
@@ -67,7 +67,7 @@ int main(void) {
 
 
     // TESTING PERMISISON ON /tmp/foobar.txt (pathfd handles non existing files correctly)
-    ghr_assert(gh_pathfd_open(AT_FDCWD, "/tmp/foobar.txt", &fd, false));
+    ghr_assert(gh_pathfd_open(AT_FDCWD, "/tmp/foobar.txt", &fd, GH_PATHFD_ALLOWMISSING));
 
 
     // READ in /tmp is 'children accept'
@@ -86,7 +86,7 @@ int main(void) {
     ghr_assert(gh_pathfd_close(fd));
 
     // TESTING PERMISSIONS ON /foobar.txt
-    ghr_assert(gh_pathfd_open(AT_FDCWD, "/foobar.txt", &fd, false));
+    ghr_assert(gh_pathfd_open(AT_FDCWD, "/foobar.txt", &fd, GH_PATHFD_ALLOWMISSING));
 
     // READ on /foobar.txt is 'self accept'
     ghr_assert(gh_perms_gatefile(&thread.perms, thread.safe_id, fd, GH_PERMFS_READ, NULL));
@@ -109,7 +109,7 @@ int main(void) {
     char output_buf[4096] = {0};
     assert(read(outputfd, output_buf, sizeof(output_buf)) >= 0);
     char output_check_buf[4096] = {0};
-    int outputcheckfd = open("parser_output.ghperm", O_RDONLY);
+    int outputcheckfd = open("parser_output.txt", O_RDONLY);
     assert(outputcheckfd >= 0);
     assert(read(outputcheckfd, output_check_buf, sizeof(output_check_buf)) >= 0);
     assert(strcmp(output_buf, output_check_buf) == 0);

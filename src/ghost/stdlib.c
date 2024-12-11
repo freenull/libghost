@@ -393,7 +393,12 @@ gh_result gh_std_execute(gh_thread * thread, int dirfd, const char * shellscript
     int pty_slavefd = -1;
 
     if (out_ptyfd != NULL) {
-        if (openpty(&pty_masterfd, &pty_slavefd, NULL, NULL, NULL) < 0) {
+        static struct termios termios;
+        termios.c_iflag = 0;
+        termios.c_oflag = 0;
+        termios.c_cflag = ICANON;
+        termios.c_lflag = 0;
+        if (openpty(&pty_masterfd, &pty_slavefd, NULL, &termios, NULL) < 0) {
             res = ghr_errno(GHR_STD_SPAWNPTY);
             goto close_pathfd;
         }

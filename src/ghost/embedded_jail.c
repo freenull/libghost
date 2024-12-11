@@ -1,4 +1,6 @@
 #define _GNU_SOURCE
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/mman.h>
 #include <ghost/result.h>
@@ -51,9 +53,15 @@ gh_result gh_embeddedjail_exec(const char * name, int options_fd) {
 #pragma GCC diagnostic ignored "-Wcast-qual"
     // RATIONALE: The cast is okay, exec replaces the entire address space anyway.
     
-    char * const envp[] = {
+    char * envp[] = {
+        NULL,
         NULL
     };
+
+    const char * sandbox_disabled = getenv("GH_SANDBOX_DISABLED");
+    if (sandbox_disabled != NULL && strcmp(sandbox_disabled, "1") == 0) {
+        envp[0] = "GH_SANDBOX_DISABLED=1";
+    }
 
     int exec_res = execve("/home/db/Projects/C/ghost/build/ghost-jail", (char * const *)argv, envp);
     /* int exec_res = fexecve(fd, (char * const *)argv, envp); */

@@ -4,8 +4,8 @@
 #include <ghost/fdmem.h>
 
 static gh_result ipcfdmem_ctorfdo(gh_fdmem * fdmem, int fd, int prot, size_t size, size_t occupied) {
-    void * map = mmap(NULL, size, prot, MAP_SHARED, fd, 0);
-    if (map == MAP_FAILED) return GHR_IPCFDMEM_MAPFAIL;
+    void * map = mmap(NULL, size, prot, (prot & PROT_WRITE) ? MAP_SHARED : MAP_PRIVATE, fd, 0);
+    if (map == MAP_FAILED) return ghr_errno(GHR_IPCFDMEM_MAPFAIL);
 
     fdmem->fd = fd;
     fdmem->data = map;
@@ -125,6 +125,10 @@ gh_result gh_fdmem_seal(gh_fdmem * fdmem) {
 
     int fcntl_res = fcntl(fdmem->fd, F_ADD_SEALS, F_SEAL_SEAL | F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE);
     if (fcntl_res < 0) return ghr_errno(GHR_IPCFDMEM_SEAL);
+
+    printf("FD: %d\n", fdmem->fd);
+    printf("SIZE: %zu\n", fdmem->size);
+    printf("OCCUPIED: %zu\n", fdmem->occupied);
 
     gh_result res = ipcfdmem_ctorfdo(fdmem, fdmem->fd, PROT_READ, fdmem->size, fdmem->occupied);
     if (ghr_iserr(res)) return res;

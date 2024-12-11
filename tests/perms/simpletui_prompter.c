@@ -25,7 +25,7 @@ int main(void) {
     req.fields[2].value.buffer = "read,write";
     req.fields[2].value.size = strlen(req.fields[2].value.buffer);
 
-    assert(write(pipefd[1], "a\n", 2) == 2);
+    assert(write(pipefd[1], "y\n", 2) == 2);
     gh_permresponse resp = {0};
     ghr_assert(gh_permprompter_request(&p, &req, &resp));
     fprintf(stderr, "response: %d\n", resp);
