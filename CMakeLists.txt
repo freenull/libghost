@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.27)
-project(ghost VERSION 1.0.0 DESCRIPTION "Safe Lua runtime based on LuaJIT")
+project(ghost VERSION 1.0.0 DESCRIPTION "Safe Lua runtime based on LuaJIT" LANGUAGES C)
 include(GNUInstallDirs)
 include(CTest)
 include(CMakeParseArguments)

@@ -3,8 +3,6 @@
 #include <ghost/alloc.h>
 #include <ghost/dynamic_array.h>
 #include <ghost/byte_buffer.h>
-#include <valgrind/memcheck.h>
-#include <valgrind/valgrind.h>
 
 static const gh_dynamicarrayoptions bb_daopts = {
     .initial_capacity = GH_BYTEBUFFER_INITIALCAPACITY,

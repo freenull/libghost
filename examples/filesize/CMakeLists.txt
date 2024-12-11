@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.27)
-project(filesize VERSION 1.0.0 DESCRIPTION "Calculate file size with a secure Lua plugin")
+project(filesize VERSION 1.0.0 DESCRIPTION "Calculate file size with a secure Lua plugin" LANGUAGES C)
 add_executable(filesize filesize.c)
 target_link_libraries(filesize libghost)
 configure_file(filesize.lua filesize.lua COPYONLY)
